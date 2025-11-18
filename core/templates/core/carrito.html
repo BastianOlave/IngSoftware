@@ -55,7 +55,9 @@
                         <span class="fs-4 fw-bold text-success">${{ total }}</span>
                     </div>
                     <div class="d-grid gap-2">
-                        <button class="btn btn-dark btn-lg">Ir a Pagar</button>
+                        <a href="{% url 'core:checkout' %}" class="btn btn-dark btn-lg shadow">
+                            Ir a Pagar <i class="bi bi-credit-card-2-front ms-2"></i>
+                        </a>
                         <a href="{% url 'core:home' %}" class="btn btn-outline-secondary">Seguir comprando</a>
                     </div>
                 </div>

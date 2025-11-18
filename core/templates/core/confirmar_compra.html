@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirmar Envío - Vive Sano{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4 text-center">📦 Datos de Despacho</h2>
+    
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    Resumen del Pedido
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">Total a Pagar: <span class="text-success fw-bold">${{ total }}</span></h5>
+                    <p class="card-text text-muted">Estás a un paso de finalizar tu compra.</p>
+                    
+                    <hr>
+
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Dirección de Envío</label>
+                            {{ form.direccion }}
+                            <div class="form-text">Indica calle, numeración y comuna.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Teléfono de Contacto</label>
+                            {{ form.telefono }}
+                        </div>
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                Confirmar y Pagar <i class="bi bi-check-circle-fill ms-2"></i>
+                            </button>
+                            <a href="{% url 'core:ver_carrito' %}" class="btn btn-outline-secondary">
+                                Volver al Carrito
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+/* --- static/css/styles.css --- */
+
+/* Fondo general suave */
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Mejoras en la Barra de Navegación */
+.navbar-brand {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.nav-link {
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.nav-link:hover {
+    color: #d1e7dd !important; /* Un verde muy suave al pasar el mouse */
+}
+
+/* Tarjetas con sombra moderna y bordes redondeados */
+.card {
+    border: none;
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Efecto al pasar el mouse por productos */
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+}
+
+/* Botones redondeados */
+.btn {
+    border-radius: 50px; /* Botones estilo píldora */
+    padding: 8px 20px;
+    font-weight: 600;
+}
+
+/* Badges (Etiquetas) más suaves */
+.badge {
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+/* Carrusel principal */
+#heroCarousel .carousel-item {
+    min-height: 400px;
+}
+
+.home-banner {
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+}
