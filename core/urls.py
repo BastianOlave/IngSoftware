@@ -1,0 +1,17 @@
+from django.urls import path
+from . import views
+
+app_name = 'core'
+
+urlpatterns = [
+    path('', views.home, name='home'),
+    # Nueva ruta que recibe el ID
+    path('producto/<int:producto_id>/', views.detalle_producto, name='detalle'),
+    path('carrito/', views.ver_carrito, name='ver_carrito'),
+    path('carrito/agregar/<int:producto_id>/', views.agregar_producto, name='agregar'),
+    path('carrito/eliminar/<int:producto_id>/', views.eliminar_producto, name='eliminar'),
+    path('carrito/limpiar/', views.limpiar_carrito, name='limpiar'),
+    path('registro/', views.registro, name='registro'),
+    path('login/', views.login_usuario, name='login'),
+    path('logout/', views.logout_usuario, name='logout'),
+]

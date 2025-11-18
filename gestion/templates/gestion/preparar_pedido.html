@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block title %}Preparar Pedido #{{ pedido.id }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <a href="{% url 'dashboard_logistica' %}" class="btn btn-outline-secondary mb-3">
+        <i class="bi bi-arrow-left"></i> Volver al listado
+    </a>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Contenido del Pedido #{{ pedido.id }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info d-flex align-items-center">
+                        <i class="bi bi-info-circle-fill me-2 fs-4"></i>
+                        <div>
+                            <strong>Instrucción:</strong> Revisa que haya stock físico de cada producto antes de confirmar.
+                        </div>
+                    </div>
+
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th class="text-center">Cantidad Solicitada</th>
+                                <th class="text-center">Stock en Sistema</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for detalle in pedido.detalles.all %}
+                            <tr>
+                                <td>
+                                    <strong>{{ detalle.producto.nombre }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ detalle.producto.categoria }}</small>
+                                </td>
+                                <td class="text-center fs-5 fw-bold">{{ detalle.cantidad }}</td>
+                                <td class="text-center">
+                                    {% if detalle.producto.stock >= detalle.cantidad %}
+                                        <span class="badge bg-success">{{ detalle.producto.stock }} unid.</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">{{ detalle.producto.stock }} unid. (Falta Stock)</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <h6>Datos de Despacho</h6>
+                    <p class="mb-1"><strong>Cliente:</strong> {{ pedido.cliente.nombre }} {{ pedido.cliente.apellido }}</p>
+                    <p class="mb-0"><strong>Dirección:</strong> {{ pedido.cliente.direccion }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-primary mb-3">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-primary">Acciones de Logística</h5>
+                    <p class="card-text text-muted small">Selecciona una acción para finalizar la preparación.</p>
+                    
+                    <hr>
+
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'confirmar_pedido' pedido.id %}" class="btn btn-success btn-lg mb-2">
+                            <i class="bi bi-box-seam-fill"></i> Pedido Completo
+                        </a>
+                        <small class="text-muted text-center mb-3">
+                            Descuenta el stock automáticamente y marca como despachado.
+                        </small>
+
+                        <a href="{% url 'reportar_faltante' pedido.id %}" class="btn btn-outline-danger">
+                            <i class="bi bi-bell-fill"></i> Notificar Faltante
+                        </a>
+                        <small class="text-muted text-center">
+                            Envía alerta a Atención al Cliente y pausa el pedido.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

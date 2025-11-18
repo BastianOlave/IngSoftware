@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Logística - Pedidos Pendientes{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2 class="mb-4"><i class="bi bi-box-seam text-success"></i> Gestión de Logística</h2>
+        
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Pedidos Pendientes de Preparación</h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0 table-striped">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID Pedido</th>
+                            <th>Fecha</th>
+                            <th>Cliente</th>
+                            <th>Estado</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pedido in pedidos %}
+                        <tr>
+                            <td class="fw-bold">#{{ pedido.id }}</td>
+                            <td>{{ pedido.fecha|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                {% if pedido.cliente %}
+                                    {{ pedido.cliente.nombre }} {{ pedido.cliente.apellido }}
+                                {% else %}
+                                    <span class="badge bg-secondary">Invitado</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if pedido.estado == 'Pendiente' %}
+                                    <span class="badge bg-warning text-dark">Pendiente</span>
+                                {% elif pedido.estado == 'En Preparacion' %}
+                                    <span class="badge bg-info text-dark">En Preparación</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'preparar_pedido' pedido.id %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-pencil-square"></i> Preparar
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                <i class="bi bi-check-circle fs-1 d-block mb-2"></i>
+                                ¡Todo al día! No hay pedidos pendientes.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
