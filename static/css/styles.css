@@ -55,3 +55,12 @@ body {
 .home-banner {
     text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
 }
+
+.product-card .card-img-top {
+    height: 250px;
+    width: 100%;
+    object-fit: contain; 
+    padding: 15px;  
+    background-color: #fff;
+    border-radius: 12px 12px 0 0;
+}

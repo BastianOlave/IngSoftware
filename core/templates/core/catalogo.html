@@ -11,7 +11,7 @@
         <div class="col">
             <div class="card h-100 shadow-sm border-0 product-card">
                 {% if producto.imagen %}
-                    <img src="{{ producto.imagen.url }}" class="card-img-top" alt="{{ producto.nombre }}" style="height: 250px; object-fit: cover;">
+                    <img src="{{ producto.imagen.url }}" class="card-img-top" alt="{{ producto.nombre }}">
                 {% else %}
                     <div class="bg-light d-flex align-items-center justify-content-center text-muted" style="height: 250px;">
                         <i class="bi bi-image fs-1"></i>
