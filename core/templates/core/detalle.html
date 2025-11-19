@@ -1,17 +1,20 @@
 {% extends 'base.html' %}
-
-{% block title %}{{ producto.nombre }} - Vive Sano{% endblock %}
+{% load filtros_extra %} {% block title %}{{ producto.nombre }} - Vive Sano{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
-    <a href="{% url 'core:home' %}" class="btn btn-outline-secondary mb-4">
-        <i class="bi bi-arrow-left"></i> Volver a la tienda
+    <a href="{% url 'core:catalogo' %}" class="btn btn-outline-secondary mb-4">
+        <i class="bi bi-arrow-left"></i> Volver al catálogo
     </a>
 
     <div class="card border-0 shadow-lg overflow-hidden">
         <div class="row g-0">
             <div class="col-md-6 bg-light d-flex align-items-center justify-content-center" style="min-height: 400px;">
-                <i class="bi bi-basket display-1 text-secondary opacity-25"></i>
+                {% if producto.imagen %}
+                    <img src="{{ producto.imagen.url }}" class="img-fluid" alt="{{ producto.nombre }}" style="width: 100%; height: 100%; object-fit: cover;">
+                {% else %}
+                    <i class="bi bi-basket display-1 text-secondary opacity-25"></i>
+                {% endif %}
             </div>
             
             <div class="col-md-6">
@@ -19,7 +22,7 @@
                     <div class="mb-auto">
                         <small class="text-uppercase text-muted fw-bold">{{ producto.categoria|default:"General" }}</small>
                         <h1 class="fw-bold mt-2">{{ producto.nombre }}</h1>
-                        <h2 class="text-success fw-bold my-3">${{ producto.precio }}</h2>
+                        <h2 class="text-success fw-bold my-3">{{ producto.precio|clp }}</h2>
                         
                         <p class="lead text-secondary">{{ producto.descripcion|default:"Sin descripción detallada." }}</p>
                         
@@ -40,10 +43,11 @@
                         </div>
                     </div>
 
-                   <div class="mt-5 pt-4 border-top">
+                    <div class="mt-5 pt-4 border-top">
                         {% if producto.stock > 0 %}
                             <form action="{% url 'core:agregar' producto.id %}" method="POST" class="d-flex gap-3">
-                                {% csrf_token %} <input type="number" name="cantidad" class="form-control" value="1" min="1" max="{{ producto.stock }}" style="width: 80px;">
+                                {% csrf_token %}
+                                <input type="number" name="cantidad" class="form-control" value="1" min="1" max="{{ producto.stock }}" style="width: 80px;">
                                 <button type="submit" class="btn btn-success btn-lg flex-grow-1 shadow-sm">
                                     <i class="bi bi-cart-plus"></i> Agregar al Carrito
                                 </button>

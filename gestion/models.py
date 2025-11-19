@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User, Group
+import os
 
 class Producto(models.Model):
     nombre = models.CharField(max_length=100)
@@ -7,7 +8,7 @@ class Producto(models.Model):
     precio = models.DecimalField(max_digits=10, decimal_places=2) # Usamos Decimal para dinero
     stock = models.IntegerField(default=0)
     categoria = models.CharField(max_length=50, blank=True)
-    # fechaVencimiento = models.DateField(null=True, blank=True) # Opcional por ahora
+    imagen = models.ImageField(upload_to='productos/', null=True, blank=True)
 
     def __str__(self):
         return self.nombre

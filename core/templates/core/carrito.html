@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
-
-{% block title %}Tu Carrito - Vive Sano{% endblock %}
+{% load filtros_extra %} {% block title %}Tu Carrito - Vive Sano{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
@@ -24,10 +23,15 @@
                         <tbody>
                             {% for key, item in carrito.carrito.items %}
                             <tr>
-                                <td>{{ item.nombre }}</td>
-                                <td>${{ item.precio }}</td>
+                                <td>
+                                    <div class="fw-bold">{{ item.nombre }}</div>
+                                </td>
+                                <td>{{ item.precio|clp }}</td>
                                 <td>{{ item.cantidad }}</td>
-                                <td>${% widthratio item.precio 1 item.cantidad %}</td>
+                                <td>
+                                    {% widthratio item.precio 1 item.cantidad as subtotal %}
+                                    {{ subtotal|clp }}
+                                </td>
                                 <td>
                                     <a href="{% url 'core:eliminar' item.producto_id %}" class="text-danger">
                                         <i class="bi bi-trash-fill"></i>
@@ -52,13 +56,13 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between mb-3">
                         <span class="fw-bold">Total a Pagar:</span>
-                        <span class="fs-4 fw-bold text-success">${{ total }}</span>
+                        <span class="fs-4 fw-bold text-success">{{ total|clp }}</span>
                     </div>
                     <div class="d-grid gap-2">
                         <a href="{% url 'core:checkout' %}" class="btn btn-dark btn-lg shadow">
                             Ir a Pagar <i class="bi bi-credit-card-2-front ms-2"></i>
                         </a>
-                        <a href="{% url 'core:home' %}" class="btn btn-outline-secondary">Seguir comprando</a>
+                        <a href="{% url 'core:catalogo' %}" class="btn btn-outline-secondary">Seguir comprando</a>
                     </div>
                 </div>
             </div>
@@ -68,7 +72,7 @@
     <div class="text-center py-5 bg-light rounded-3">
         <i class="bi bi-cart-x display-1 text-muted"></i>
         <h3 class="mt-3 text-muted">Tu carrito está vacío</h3>
-        <a href="{% url 'core:home' %}" class="btn btn-success mt-3">Ir a comprar</a>
+        <a href="{% url 'core:catalogo' %}" class="btn btn-success mt-3">Ir a comprar</a>
     </div>
     {% endif %}
 </div>

@@ -6,6 +6,7 @@ from django.contrib.auth import login, logout
 from gestion.models import Producto
 from .carrito import Carrito
 from .forms import DatosEnvioForm, RegistroClienteForm
+from django.core.paginator import Paginator
 
 
 def home(request):
@@ -141,3 +142,11 @@ def checkout(request):
         'carrito': carrito,
         'total': carrito.obtener_total_precio()
     })
+
+def catalogo(request):
+    productos_list = Producto.objects.all().order_by('id')
+    paginator = Paginator(productos_list, 6) 
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'core/catalogo.html', {'page_obj': page_obj})

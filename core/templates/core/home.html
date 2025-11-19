@@ -1,11 +1,9 @@
 {% extends 'base.html' %}
-
-{% block title %}Inicio - Vive Sano{% endblock %}
+{% load filtros_extra %} {% block title %}Inicio - Vive Sano{% endblock %}
 
 {% block carousel %}
 <div id="heroCarousel" class="carousel slide shadow mb-5" data-bs-ride="carousel">
   <div class="carousel-inner">
-    
     <div class="carousel-item active" style="height: 400px; background-color: #fdf2f2;">
       <div class="d-flex align-items-center justify-content-center h-100">
         <div class="container">
@@ -14,17 +12,16 @@
                     <span class="badge bg-danger mb-2">¡Oferta Limitada!</span>
                     <h1 class="display-4 fw-bold text-dark">Descuentos de temporada</h1>
                     <p class="lead text-muted">Ahorra en tus productos favoritos por tiempo limitado.</p>
-                    <button class="btn btn-primary btn-lg">Aprovechar</button>
+                    <a href="{% url 'core:catalogo' %}" class="btn btn-primary btn-lg">Aprovechar</a>
                 </div>
                 <div class="col-md-6 text-center">
-                     <img src="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" 
+                    <img src="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" 
                          class="img-fluid rounded-3 shadow-sm" alt="Bowl saludable" style="max-height: 350px;">
                 </div>
             </div>
         </div>
       </div>
     </div>
-
     <div class="carousel-item" style="height: 400px; background-color: #eafaf1;">
        <div class="d-flex align-items-center justify-content-center h-100">
         <div class="container">
@@ -32,7 +29,7 @@
                 <div class="col-md-6 p-5 order-md-2">
                     <h1 class="display-4 fw-bold text-success">Nuevo: Kit Detox</h1>
                     <p class="lead text-muted">Paquetes semanales para revitalizar tu cuerpo.</p>
-                    <button class="btn btn-success btn-lg">Ver Kits</button>
+                    <a href="{% url 'core:catalogo' %}" class="btn btn-success btn-lg">Ver Kits</a>
                 </div>
                 <div class="col-md-6 text-center order-md-1">
                     <img src="https://images.unsplash.com/photo-1540420773420-3366772f4999?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" 
@@ -42,7 +39,6 @@
         </div>
       </div>
     </div>
-
   </div>
   <button class="carousel-control-prev" type="button" data-bs-target="#heroCarousel" data-bs-slide="prev">
     <span class="carousel-control-prev-icon bg-dark rounded-circle" aria-hidden="true"></span>
@@ -57,18 +53,12 @@
 
 {% block content %}
 <section class="container pb-5">
-  
   <div class="row g-4 mb-5">
       <div class="col-md-6">
           <div class="card border-0 shadow-sm bg-light">
               <div class="card-body d-flex align-items-center p-4">
-                  <div class="bg-white p-3 rounded-circle me-3 shadow-sm">
-                    <i class="bi bi-truck fs-3 text-primary"></i>
-                  </div>
-                  <div>
-                      <h5 class="fw-bold mb-0">Envío gratis</h5>
-                      <p class="mb-0 text-muted">En compras sobre $25.000</p>
-                  </div>
+                  <div class="bg-white p-3 rounded-circle me-3 shadow-sm"><i class="bi bi-truck fs-3 text-primary"></i></div>
+                  <div><h5 class="fw-bold mb-0">Envío gratis</h5><p class="mb-0 text-muted">En compras sobre $25.000</p></div>
                   <span class="badge bg-primary ms-auto">Hoy</span>
               </div>
           </div>
@@ -76,13 +66,8 @@
       <div class="col-md-6">
           <div class="card border-0 shadow-sm bg-light">
               <div class="card-body d-flex align-items-center p-4">
-                  <div class="bg-white p-3 rounded-circle me-3 shadow-sm">
-                    <i class="bi bi-stars fs-3 text-success"></i>
-                  </div>
-                  <div>
-                      <h5 class="fw-bold mb-0">Nuevo: Kit Detox</h5>
-                      <p class="mb-0 text-muted">Paquetes semanales</p>
-                  </div>
+                  <div class="bg-white p-3 rounded-circle me-3 shadow-sm"><i class="bi bi-stars fs-3 text-success"></i></div>
+                  <div><h5 class="fw-bold mb-0">Nuevo: Kit Detox</h5><p class="mb-0 text-muted">Paquetes semanales</p></div>
                   <span class="badge bg-success ms-auto">Salud</span>
               </div>
           </div>
@@ -91,19 +76,22 @@
 
   <h3 class="mb-4 fw-bold">Productos destacados</h3>
   <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
-    
     {% for prod in productos %}
     <div class="col">
       <div class="card h-100 border-0 shadow-sm">
-        <div class="bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center" style="height: 200px;">
-            <i class="bi bi-basket display-1 text-secondary opacity-25"></i>
-        </div>
+        {% if prod.imagen %}
+            <img src="{{ prod.imagen.url }}" class="card-img-top" alt="{{ prod.nombre }}" style="height: 200px; object-fit: cover;">
+        {% else %}
+            <div class="bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center" style="height: 200px;">
+                <i class="bi bi-basket display-1 text-secondary opacity-25"></i>
+            </div>
+        {% endif %}
         
         <div class="card-body">
           <h5 class="card-title fw-bold">{{ prod.nombre }}</h5>
           <p class="card-text text-muted small">{{ prod.descripcion|truncatechars:50|default:"Sin descripción" }}</p>
           <div class="d-flex justify-content-between align-items-center mt-3">
-              <span class="fs-5 fw-bold text-success">${{ prod.precio }}</span>
+              <span class="fs-5 fw-bold text-success">{{ prod.precio|clp }}</span>
               <a href="{% url 'core:detalle' prod.id %}" class="btn btn-sm btn-outline-success rounded-pill">Ver</a>
           </div>
         </div>
@@ -111,10 +99,9 @@
     </div>
     {% empty %}
     <div class="col-12 text-center py-5">
-        <p class="text-muted">No hay productos destacados aún. ¡Agrega algunos en el Admin!</p>
+        <p class="text-muted">No hay productos destacados aún.</p>
     </div>
     {% endfor %}
-
   </div>
 </section>
 {% endblock %}
