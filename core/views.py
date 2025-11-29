@@ -18,7 +18,9 @@ from gestion.models import Producto, Cliente, Pedido, DetallePedido
 from .carrito import Carrito
 from .forms import DatosEnvioForm, RegistroClienteForm, PerfilUsuarioForm
 
-# --- VISTAS GENERALES ---
+# ---------------------------------------------------------
+# VISTAS GENERALES
+# ---------------------------------------------------------
 
 def home(request):
     productos_destacados = Producto.objects.all()[:4]
@@ -35,7 +37,9 @@ def detalle_producto(request, producto_id):
     producto = get_object_or_404(Producto, id=producto_id)
     return render(request, 'core/detalle.html', {'producto': producto})
 
-# --- CARRITO ---
+# ---------------------------------------------------------
+# VISTAS DEL CARRITO
+# ---------------------------------------------------------
 
 def agregar_producto(request, producto_id):
     carrito = Carrito(request)
@@ -87,7 +91,9 @@ def ver_carrito(request):
         'total': carrito.obtener_total_precio()
     })
 
-# --- USUARIOS (AUTH + PERFIL) ---
+# ---------------------------------------------------------
+# VISTAS DE USUARIO (AUTH + PERFIL + PEDIDOS)
+# ---------------------------------------------------------
 
 def registro(request):
     if request.method == 'POST':
@@ -127,28 +133,23 @@ def logout_usuario(request):
 @login_required
 def perfil_usuario(request):
     cliente, created = Cliente.objects.get_or_create(user=request.user)
-
     if request.method == 'POST':
         form = PerfilUsuarioForm(request.POST, instance=cliente, user=request.user)
         if form.is_valid():
-            # Actualizar Auth User
             request.user.first_name = form.cleaned_data['first_name']
             request.user.last_name = form.cleaned_data['last_name']
             request.user.email = form.cleaned_data['email']
             request.user.save()
 
-            # Actualizar Cliente
             cliente = form.save(commit=False)
             cliente.nombre = form.cleaned_data['first_name']
             cliente.apellido = form.cleaned_data['last_name']
             cliente.email = form.cleaned_data['email']
             
-            # Unir teléfono
             codigo = form.cleaned_data['codigo_pais']
             numero = form.cleaned_data['telefono']
             cliente.telefono = f"{codigo}{numero}"
             
-            # Guardar CP y resto
             cliente.codigo_postal = form.cleaned_data['codigo_postal']
             cliente.save()
             
@@ -156,7 +157,6 @@ def perfil_usuario(request):
             return redirect('core:perfil')
     else:
         form = PerfilUsuarioForm(instance=cliente, user=request.user)
-
     return render(request, 'core/perfil.html', {'form': form})
 
 @login_required
@@ -168,7 +168,39 @@ def mis_pedidos(request):
         pedidos = []
     return render(request, 'core/mis_pedidos.html', {'pedidos': pedidos})
 
-# --- PAGO (CHECKOUT + WEBPAY) ---
+@login_required
+def detalle_pedido_cliente(request, pedido_id):
+    try:
+        cliente = Cliente.objects.get(user=request.user)
+        pedido = get_object_or_404(Pedido, id=pedido_id, cliente=cliente)
+    except Cliente.DoesNotExist:
+        return redirect('core:home')
+
+    estado_actual = pedido.estado
+    progreso = {
+        'recibido': True,
+        'pagado': False,
+        'preparacion': False,
+        'despachado': False
+    }
+    
+    if 'Pagado' in estado_actual or 'Preparacion' in estado_actual or 'Despachado' in estado_actual:
+        progreso['pagado'] = True
+    
+    if 'Preparacion' in estado_actual or 'Despachado' in estado_actual:
+        progreso['preparacion'] = True
+        
+    if 'Despachado' in estado_actual:
+        progreso['despachado'] = True
+
+    return render(request, 'core/detalle_pedido_cliente.html', {
+        'pedido': pedido,
+        'progreso': progreso
+    })
+
+# ---------------------------------------------------------
+# PROCESO DE PAGO (CHECKOUT Y WEBPAY)
+# ---------------------------------------------------------
 
 @login_required
 def checkout(request):
@@ -201,7 +233,6 @@ def checkout(request):
             codigo = form.cleaned_data['codigo_pais']
             numero = form.cleaned_data['telefono']
             cliente.telefono = f"{codigo}{numero}"
-            
             cliente.codigo_postal = form.cleaned_data['codigo_postal']
             cliente.save()
 
@@ -210,6 +241,9 @@ def checkout(request):
                 if producto_bd.stock < item['cantidad']:
                     messages.error(request, f"Sin stock suficiente de {producto_bd.nombre}.")
                     return redirect('core:ver_carrito')
+
+            # Limpieza de pedidos basura
+            Pedido.objects.filter(cliente=cliente, estado='Pendiente').delete()
 
             pedido = Pedido.objects.create(
                 cliente=cliente,
@@ -256,6 +290,7 @@ def iniciar_pago_webpay(request, pedido_id):
     return_url = request.build_absolute_uri('/webpay/retorno/') 
     
     response = tx.create(buy_order, session_id, amount, return_url)
+    
     return redirect(response['url'] + '?token_ws=' + response['token'])
 
 def confirmar_pago_webpay(request):

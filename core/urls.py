@@ -22,4 +22,5 @@ urlpatterns = [
     path('carrito/actualizar/<int:producto_id>/', views.actualizar_carrito, name='actualizar'),
     path('perfil/', views.perfil_usuario, name='perfil'),
     path('mis-pedidos/', views.mis_pedidos, name='mis_pedidos'),
+    path('mis-pedidos/detalle/<int:pedido_id>/', views.detalle_pedido_cliente, name='detalle_pedido_cliente'),
 ]

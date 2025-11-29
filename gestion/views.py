@@ -3,22 +3,29 @@ from django.contrib.auth.models import Group
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.conf import settings
-from django.db.models import Q # <--- IMPORTANTE: Para filtros avanzados (OR)
+from django.db.models import Q
+from django.contrib.auth.decorators import user_passes_test
 from core.forms import CorreoSoporteForm 
 from .models import Pedido, Notificacion, Producto
 
+# FUNCIÓN DE SEGURIDAD: Solo deja pasar si es Staff
+def es_staff(user):
+    return user.is_authenticated and user.is_staff
+
 # ---------------------------------------------------------
-# VISTAS PARA EL ENCARGADO DE LOGÍSTICA
+# VISTAS PARA EL ENCARGADO DE LOGÍSTICA (PROTEGIDAS)
 # ---------------------------------------------------------
 
+@user_passes_test(es_staff)
 def dashboard_logistica(request):
-    # Muestra pedidos activos: Pendientes, En Preparación (incluye los devueltos por soporte) y Pagados
+    # Muestra pedidos activos: Pendientes, En Preparación y Pagados
     pedidos_pendientes = Pedido.objects.filter(
         estado__in=['Pendiente', 'En Preparacion', 'Pagado (WebPay)']
     ).order_by('fecha')
     
     return render(request, 'gestion/dashboard_logistica.html', {'pedidos': pedidos_pendientes})
 
+@user_passes_test(es_staff)
 def preparar_pedido(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     
@@ -28,21 +35,16 @@ def preparar_pedido(request, pedido_id):
         
     return render(request, 'gestion/preparar_pedido.html', {'pedido': pedido})
 
+@user_passes_test(es_staff)
 def confirmar_pedido_listo(request, pedido_id):
     # ACCIÓN A: Pedido Completo
     pedido = get_object_or_404(Pedido, id=pedido_id)
     
-    # Marcamos como Despachado (WebPay) por defecto para este flujo
+    # Marcamos como Despachado (WebPay) para mantener la trazabilidad visual
     estado_final = 'Despachado (WebPay)'
     
-    # Lógica de stock manual si fuera necesario (comentada para flujo WebPay)
-    """
-    if 'WebPay' not in pedido.estado: 
-        for detalle in pedido.detalles.all():
-            producto = detalle.producto
-            producto.stock -= detalle.cantidad
-            producto.save()
-    """
+    # NOTA: No descontamos stock aquí porque ya lo hizo WebPay al confirmar el pago.
+    # Si fuera un flujo manual (transferencia), aquí se descontaría.
     
     pedido.estado = estado_final
     pedido.save()
@@ -50,6 +52,7 @@ def confirmar_pedido_listo(request, pedido_id):
     messages.success(request, f"Pedido #{pedido.id} marcado como {estado_final}.")
     return redirect('dashboard_logistica')
 
+@user_passes_test(es_staff)
 def reportar_faltante(request, pedido_id):
     # ACCIÓN B: Problema de stock -> A Atención al Cliente
     pedido = get_object_or_404(Pedido, id=pedido_id)
@@ -72,8 +75,9 @@ def reportar_faltante(request, pedido_id):
 
     return redirect('dashboard_logistica')
 
+@user_passes_test(es_staff)
 def historial_despachos(request):
-    # AHORA MUESTRA TODO EL HISTORIAL FINAL: Despachados O Anulados
+    # Filtro avanzado: Busca todo lo que empiece con Despachado O Anulado
     pedidos_completados = Pedido.objects.filter(
         Q(estado__startswith='Despachado') | Q(estado__startswith='Anulado')
     ).order_by('-fecha')
@@ -81,9 +85,10 @@ def historial_despachos(request):
     return render(request, 'gestion/historial_despachos.html', {'pedidos': pedidos_completados})
 
 # ---------------------------------------------------------
-# VISTAS PARA ATENCIÓN AL CLIENTE (CRM)
+# VISTAS PARA ATENCIÓN AL CLIENTE (CRM) - PROTEGIDAS
 # ---------------------------------------------------------
 
+@user_passes_test(es_staff)
 def dashboard_atencion(request):
     try:
         grupo_atencion = Group.objects.get(name='Atencion al cliente')
@@ -95,6 +100,7 @@ def dashboard_atencion(request):
         
     return render(request, 'gestion/dashboard_atencion.html', {'notificaciones': notificaciones})
 
+@user_passes_test(es_staff)
 def redactar_correo(request, notificacion_id):
     notif = get_object_or_404(Notificacion, id=notificacion_id)
     pedido = notif.pedido
@@ -106,7 +112,6 @@ def redactar_correo(request, notificacion_id):
             asunto = form.cleaned_data['asunto']
             
             try:
-                # Enviar correo real
                 send_mail(
                     subject=asunto,
                     message=mensaje,
@@ -140,60 +145,59 @@ def redactar_correo(request, notificacion_id):
 
     return render(request, 'gestion/redactar_correo.html', {'form': form, 'notif': notif})
 
+@user_passes_test(es_staff)
 def registrar_respuesta(request, notificacion_id):
-    messages.info(request, "Se ha registrado la respuesta del cliente. Ahora puedes gestionar el caso.")
+    messages.info(request, "Se ha registrado la respuesta del cliente.")
     return redirect('dashboard_atencion')
 
+@user_passes_test(es_staff)
 def marcar_gestionado(request, notificacion_id):
-    # CASO 1: Cliente acepta solución (Resuelto)
-    # Devolvemos el pedido a logística para que lo despache con los cambios
+    # CASO 1: Cliente acepta solución (Resuelto) -> Vuelve a Logística
     notif = get_object_or_404(Notificacion, id=notificacion_id)
     pedido = notif.pedido
     
-    # 1. Cambiar estado para que Logística lo vea de nuevo
     pedido.estado = 'En Preparacion'
     pedido.save()
     
-    # 2. Cerrar notificación
     notif.estado = 'LISTO'
     notif.save()
     
-    messages.success(request, f"Incidencia resuelta. El Pedido #{pedido.id} ha vuelto al panel de Logística para su despacho.")
+    messages.success(request, f"Incidencia resuelta. Pedido devuelto a Logística.")
     return redirect('dashboard_atencion')
 
+@user_passes_test(es_staff)
 def anular_pedido(request, notificacion_id):
     # CASO 2: Cliente pide reembolso (Cancelado)
     notif = get_object_or_404(Notificacion, id=notificacion_id)
     pedido = notif.pedido
     
-    # 1. Devolver Stock
+    # Devolver Stock
     for detalle in pedido.detalles.all():
         producto = detalle.producto
         producto.stock += detalle.cantidad
         producto.save()
         
-    # 2. Anular Pedido
     pedido.estado = 'Anulado / Reembolsado'
     pedido.save()
     
-    # 3. Cerrar Notificación
     notif.estado = 'CANCELADO'
     notif.save()
     
-    # 4. Enviar Correo Automático de Cancelación
+    # Correo automático de cancelación
     try:
         send_mail(
             subject=f"Pedido #{pedido.id} Cancelado - Vive Sano",
-            message=f"Estimado/a {pedido.cliente.nombre},\n\nLe informamos que su Pedido #{pedido.id} ha sido cancelado y su reembolso ha sido gestionado.\n\nLamentamos los inconvenientes.",
+            message=f"Estimado/a,\n\nSu Pedido #{pedido.id} ha sido cancelado y su reembolso gestionado.",
             from_email=settings.EMAIL_HOST_USER,
             recipient_list=[pedido.cliente.email],
             fail_silently=False,
         )
-        messages.success(request, "Pedido anulado y correo de confirmación enviado al cliente.")
     except:
-        messages.warning(request, "Pedido anulado, pero falló el envío del correo.")
+        pass
     
+    messages.warning(request, f"Pedido #{pedido.id} anulado. Stock restaurado.")
     return redirect('dashboard_atencion')
 
+@user_passes_test(es_staff)
 def marcar_leido(request, notificacion_id):
     return marcar_gestionado(request, notificacion_id)

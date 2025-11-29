@@ -32,6 +32,8 @@
                                         <span class="badge bg-warning text-dark">Pendiente de Pago</span>
                                     {% elif 'Pagado' in pedido.estado %}
                                         <span class="badge bg-info text-dark">Pagado / En Preparación</span>
+                                    {% elif 'Preparacion' in pedido.estado %}
+                                        <span class="badge bg-info text-dark">En Preparación</span>
                                     {% elif 'Despachado' in pedido.estado %}
                                         <span class="badge bg-success">Enviado / Entregado</span>
                                     {% elif 'Anulado' in pedido.estado %}
@@ -41,7 +43,9 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-secondary" disabled>Ver Detalle</button>
+                                    <a href="{% url 'core:detalle_pedido_cliente' pedido.id %}" class="btn btn-sm btn-outline-success rounded-pill px-3">
+                                        Ver Detalle
+                                    </a>
                                 </td>
                             </tr>
                             {% endfor %}

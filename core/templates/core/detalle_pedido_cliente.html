@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load filtros_extra %}
+
+{% block title %}Detalle Pedido #{{ pedido.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-success"><i class="bi bi-box-seam-fill"></i> Detalle de Pedido #{{ pedido.id }}</h2>
+        <a href="{% url 'core:mis_pedidos' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Volver a Mis Pedidos
+        </a>
+    </div>
+
+    {% if 'Anulado' in pedido.estado %}
+        <div class="alert alert-danger text-center">
+            <h4><i class="bi bi-x-circle-fill"></i> Este pedido ha sido ANULADO</h4>
+            <p>Si tienes dudas, contacta a soporte.</p>
+        </div>
+    {% else %}
+        <div class="card shadow-sm mb-4 border-0">
+            <div class="card-body p-4">
+                <div class="position-relative m-4">
+                    <div class="progress" style="height: 2px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: {% if progreso.despachado %}100%{% elif progreso.preparacion %}66%{% elif progreso.pagado %}33%{% else %}0%{% endif %};"></div>
+                    </div>
+                    <div class="position-absolute top-0 start-0 translate-middle btn btn-sm {% if progreso.recibido %}btn-success{% else %}btn-secondary{% endif %} rounded-pill" style="width: 2rem; height:2rem;">1</div>
+                    <div class="position-absolute top-0 start-33 translate-middle btn btn-sm {% if progreso.pagado %}btn-success{% else %}btn-secondary{% endif %} rounded-pill" style="left: 33%; width: 2rem; height:2rem;">2</div>
+                    <div class="position-absolute top-0 start-66 translate-middle btn btn-sm {% if progreso.preparacion %}btn-success{% else %}btn-secondary{% endif %} rounded-pill" style="left: 66%; width: 2rem; height:2rem;">3</div>
+                    <div class="position-absolute top-0 start-100 translate-middle btn btn-sm {% if progreso.despachado %}btn-success{% else %}btn-secondary{% endif %} rounded-pill" style="width: 2rem; height:2rem;">4</div>
+                </div>
+                <div class="d-flex justify-content-between text-muted small mt-2">
+                    <span>Recibido</span>
+                    <span>Pagado</span>
+                    <span>En Preparación</span>
+                    <span>Enviado / Entregado</span>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-4 order-md-2 mb-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Información de Envío</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-1"><strong>Cliente:</strong> {{ pedido.cliente.nombre }} {{ pedido.cliente.apellido }}</p>
+                    <p class="mb-1"><strong>Teléfono:</strong> {{ pedido.cliente.telefono }}</p>
+                    <p class="mb-1"><strong>Email:</strong> {{ pedido.cliente.email }}</p>
+                    <hr>
+                    <h6 class="text-muted">Dirección de Despacho</h6>
+                    <p class="mb-1">{{ pedido.cliente.direccion }}</p>
+                    <p class="mb-1">{{ pedido.cliente.comuna }}</p>
+                    <p class="mb-3 text-muted small">Cód. Postal: {{ pedido.cliente.codigo_postal }}</p>
+                    
+                    <h6 class="text-muted">Método de Pago</h6>
+                    {% if 'WebPay' in pedido.estado %}
+                        <div class="d-flex align-items-center text-success fw-bold">
+                            <i class="bi bi-credit-card-2-front fs-4 me-2"></i> WebPay Plus
+                        </div>
+                    {% else %}
+                        <div class="d-flex align-items-center text-secondary">
+                            <i class="bi bi-cash-coin fs-4 me-2"></i> Transferencia / Otro
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8 order-md-1">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Productos Comprados</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Producto</th>
+                                <th class="text-center">Cant.</th>
+                                <th class="text-end">Precio Unit.</th>
+                                <th class="text-end">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for detalle in pedido.detalles.all %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3 border rounded p-1 bg-white" style="width: 50px; height: 50px;">
+                                            {% if detalle.producto.imagen %}
+                                                <img src="{{ detalle.producto.imagen.url }}" alt="{{ detalle.producto.nombre }}" class="w-100 h-100" style="object-fit: contain;">
+                                            {% else %}
+                                                <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
+                                                    <i class="bi bi-image"></i>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold">{{ detalle.producto.nombre }}</div>
+                                            <small class="text-muted">{{ detalle.producto.categoria }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">{{ detalle.cantidad }}</td>
+                                <td class="text-end">{{ detalle.precio_unitario|clp }}</td>
+                                <td class="text-end fw-bold">
+                                    {% widthratio detalle.precio_unitario 1 detalle.cantidad as subtotal %}
+                                    {{ subtotal|clp }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="3" class="text-end text-uppercase text-muted small pt-3">Total Pagado:</td>
+                                <td class="text-end fs-4 fw-bold text-success">{{ pedido.total|clp }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
