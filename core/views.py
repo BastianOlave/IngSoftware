@@ -5,7 +5,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.core.paginator import Paginator
-import time  # <--- IMPORTANTE: Para el ID único de WebPay
+import time
 
 # Transbank
 from transbank.webpay.webpay_plus.transaction import Transaction
@@ -16,11 +16,9 @@ from transbank.common.integration_type import IntegrationType
 
 from gestion.models import Producto, Cliente, Pedido, DetallePedido
 from .carrito import Carrito
-from .forms import DatosEnvioForm, RegistroClienteForm
+from .forms import DatosEnvioForm, RegistroClienteForm, PerfilUsuarioForm
 
-# ---------------------------------------------------------
-# VISTAS GENERALES (HOME, CATÁLOGO, DETALLE)
-# ---------------------------------------------------------
+# --- VISTAS GENERALES ---
 
 def home(request):
     productos_destacados = Producto.objects.all()[:4]
@@ -37,9 +35,7 @@ def detalle_producto(request, producto_id):
     producto = get_object_or_404(Producto, id=producto_id)
     return render(request, 'core/detalle.html', {'producto': producto})
 
-# ---------------------------------------------------------
-# VISTAS DEL CARRITO
-# ---------------------------------------------------------
+# --- CARRITO ---
 
 def agregar_producto(request, producto_id):
     carrito = Carrito(request)
@@ -51,6 +47,26 @@ def agregar_producto(request, producto_id):
         return redirect('core:detalle', producto_id=producto_id)
     
     carrito.agregar(producto=producto, cantidad=cantidad)
+    return redirect('core:ver_carrito')
+
+def actualizar_carrito(request, producto_id):
+    carrito = Carrito(request)
+    producto = get_object_or_404(Producto, id=producto_id)
+    
+    try:
+        cantidad = int(request.POST.get('cantidad', 1))
+    except ValueError:
+        cantidad = 1
+
+    if cantidad == 0:
+        carrito.eliminar(producto)
+        return redirect('core:ver_carrito')
+
+    if cantidad > producto.stock:
+        messages.error(request, f"¡Ups! Solo quedan {producto.stock} unidades de {producto.nombre}.")
+        return redirect('core:ver_carrito')
+
+    carrito.actualizar(producto, cantidad)
     return redirect('core:ver_carrito')
 
 def eliminar_producto(request, producto_id):
@@ -71,9 +87,7 @@ def ver_carrito(request):
         'total': carrito.obtener_total_precio()
     })
 
-# ---------------------------------------------------------
-# VISTAS DE USUARIO (AUTH MEJORADO)
-# ---------------------------------------------------------
+# --- USUARIOS (AUTH + PERFIL) ---
 
 def registro(request):
     if request.method == 'POST':
@@ -90,8 +104,6 @@ def login_usuario(request):
     if request.method == 'POST':
         data = request.POST.copy()
         username = data.get('username')
-
-        # FIX: Permitir mayúsculas/minúsculas
         try:
             user_candidate = User.objects.get(username__iexact=username)
             data['username'] = user_candidate.username
@@ -99,11 +111,8 @@ def login_usuario(request):
             pass 
 
         form = AuthenticationForm(request, data=data)
-        
         if form.is_valid():
             login(request, form.get_user())
-            # Opcional: Mensaje de bienvenida
-            # messages.success(request, f"Hola {form.get_user().first_name}") 
             return redirect('core:home')
         else:
             messages.error(request, "Usuario o contraseña incorrectos.")
@@ -115,9 +124,51 @@ def logout_usuario(request):
     logout(request)
     return redirect('core:home')
 
-# ---------------------------------------------------------
-# PROCESO DE PAGO (CHECKOUT Y WEBPAY BLINDADO)
-# ---------------------------------------------------------
+@login_required
+def perfil_usuario(request):
+    cliente, created = Cliente.objects.get_or_create(user=request.user)
+
+    if request.method == 'POST':
+        form = PerfilUsuarioForm(request.POST, instance=cliente, user=request.user)
+        if form.is_valid():
+            # Actualizar Auth User
+            request.user.first_name = form.cleaned_data['first_name']
+            request.user.last_name = form.cleaned_data['last_name']
+            request.user.email = form.cleaned_data['email']
+            request.user.save()
+
+            # Actualizar Cliente
+            cliente = form.save(commit=False)
+            cliente.nombre = form.cleaned_data['first_name']
+            cliente.apellido = form.cleaned_data['last_name']
+            cliente.email = form.cleaned_data['email']
+            
+            # Unir teléfono
+            codigo = form.cleaned_data['codigo_pais']
+            numero = form.cleaned_data['telefono']
+            cliente.telefono = f"{codigo}{numero}"
+            
+            # Guardar CP y resto
+            cliente.codigo_postal = form.cleaned_data['codigo_postal']
+            cliente.save()
+            
+            messages.success(request, "Tus datos han sido actualizados correctamente.")
+            return redirect('core:perfil')
+    else:
+        form = PerfilUsuarioForm(instance=cliente, user=request.user)
+
+    return render(request, 'core/perfil.html', {'form': form})
+
+@login_required
+def mis_pedidos(request):
+    try:
+        cliente = Cliente.objects.get(user=request.user)
+        pedidos = Pedido.objects.filter(cliente=cliente).order_by('-fecha')
+    except Cliente.DoesNotExist:
+        pedidos = []
+    return render(request, 'core/mis_pedidos.html', {'pedidos': pedidos})
+
+# --- PAGO (CHECKOUT + WEBPAY) ---
 
 @login_required
 def checkout(request):
@@ -125,7 +176,6 @@ def checkout(request):
     if len(carrito) == 0:
         return redirect('core:home')
 
-    # Obtener/Crear Cliente
     try:
         cliente = Cliente.objects.get(user=request.user)
     except Cliente.DoesNotExist:
@@ -139,31 +189,28 @@ def checkout(request):
 
     if request.method == 'POST':
         form = DatosEnvioForm(request.POST, instance=cliente, user=request.user)
-        
         if form.is_valid():
-            # A) Guardar en USUARIO (para login futuro)
             request.user.first_name = form.cleaned_data['first_name']
             request.user.last_name = form.cleaned_data['last_name']
             request.user.save()
 
-            # B) Guardar en CLIENTE (para historial de logística)
             cliente = form.save(commit=False)
-            cliente.nombre = form.cleaned_data['first_name'] # <--- FIX IMPORTANTE HISTORIAL
-            cliente.apellido = form.cleaned_data['last_name'] # <--- FIX IMPORTANTE HISTORIAL
+            cliente.nombre = form.cleaned_data['first_name']
+            cliente.apellido = form.cleaned_data['last_name']
             
             codigo = form.cleaned_data['codigo_pais']
             numero = form.cleaned_data['telefono']
             cliente.telefono = f"{codigo}{numero}"
+            
+            cliente.codigo_postal = form.cleaned_data['codigo_postal']
             cliente.save()
 
-            # C) Validar Stock
             for item in carrito.obtener_items():
                 producto_bd = Producto.objects.get(id=item['producto_id'])
                 if producto_bd.stock < item['cantidad']:
                     messages.error(request, f"Sin stock suficiente de {producto_bd.nombre}.")
                     return redirect('core:ver_carrito')
 
-            # D) Crear Pedido
             pedido = Pedido.objects.create(
                 cliente=cliente,
                 total=carrito.obtener_total_precio(),
@@ -203,20 +250,16 @@ def iniciar_pago_webpay(request, pedido_id):
         IntegrationType.TEST
     ))
     
-    # FIX: ID Único con tiempo para evitar bloqueo de Transbank
     buy_order = f"P-{pedido.id}-{int(time.time())}"
     session_id = f"S-{request.user.id}-{int(time.time())}"
     amount = int(pedido.total)
     return_url = request.build_absolute_uri('/webpay/retorno/') 
     
     response = tx.create(buy_order, session_id, amount, return_url)
-    
-    # FIX: Redirección moderna directa (sin template intermedio)
     return redirect(response['url'] + '?token_ws=' + response['token'])
 
 def confirmar_pago_webpay(request):
     token = request.GET.get('token_ws') or request.POST.get('token_ws')
-    
     if not token:
         messages.error(request, "Error: No se recibió token de WebPay")
         return redirect('core:home')
@@ -230,7 +273,6 @@ def confirmar_pago_webpay(request):
         response = tx.commit(token)
         
         if response['response_code'] == 0:
-            # FIX: Recuperar ID real quitando la parte del tiempo
             buy_order_completo = response['buy_order']
             pedido_id = buy_order_completo.split('-')[1]
             
@@ -250,7 +292,6 @@ def confirmar_pago_webpay(request):
         else:
             messages.error(request, "El pago fue anulado o rechazado por WebPay.")
             return redirect('core:home')
-            
     except Exception as e:
         print(f"Error Webpay: {e}")
         messages.error(request, "Ocurrió un error técnico al confirmar el pago.")

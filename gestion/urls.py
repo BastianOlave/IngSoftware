@@ -8,6 +8,11 @@ urlpatterns = [
     path('logistica/confirmar/<int:pedido_id>/', views.confirmar_pedido_listo, name='confirmar_pedido'),
     path('logistica/reportar/<int:pedido_id>/', views.reportar_faltante, name='reportar_faltante'),
     path('logistica/historial/', views.historial_despachos, name='historial_despachos'),
+    path('atencion/', views.dashboard_atencion, name='dashboard_atencion'),
+    path('atencion/redactar/<int:notificacion_id>/', views.redactar_correo, name='redactar_correo'),
+    path('atencion/respuesta/<int:notificacion_id>/', views.registrar_respuesta, name='registrar_respuesta'),
+    path('atencion/cerrar/<int:notificacion_id>/', views.marcar_gestionado, name='marcar_gestionado'),
+    path('atencion/anular/<int:notificacion_id>/', views.anular_pedido, name='anular_pedido'),
 
     # Rutas de Atención al Cliente
     path('atencion/', views.dashboard_atencion, name='dashboard_atencion'),

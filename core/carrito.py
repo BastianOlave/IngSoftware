@@ -44,3 +44,9 @@ class Carrito:
         
     def obtener_items(self):
         return self.carrito.values()
+    
+    def actualizar(self, producto, cantidad):
+        producto_id = str(producto.id)
+        if producto_id in self.carrito:
+            self.carrito[producto_id]['cantidad'] = cantidad
+            self.guardar()

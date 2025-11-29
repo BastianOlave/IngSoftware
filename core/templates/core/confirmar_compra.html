@@ -28,38 +28,43 @@
                         
                         <h6 class="text-muted mb-3">Información Personal</h6>
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-6 mb-2">
                                 {{ form.first_name|as_crispy_field }}
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-6 mb-2">
                                 {{ form.last_name|as_crispy_field }}
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-4">
+                        <div class="row align-items-start">
+                            <div class="col-md-5 mb-2">
                                 {{ form.codigo_pais|as_crispy_field }}
                             </div>
-                            <div class="col-md-8">
+                            <div class="col-md-7 mb-2">
                                 {{ form.telefono|as_crispy_field }}
                             </div>
                         </div>
 
                         <h6 class="text-muted mb-3 mt-3">Dirección de Despacho</h6>
                         <div class="row">
-                            <div class="col-md-8">
+                            <div class="col-md-12 mb-2">
                                 {{ form.direccion|as_crispy_field }}
                             </div>
-                            <div class="col-md-4">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
                                 {{ form.comuna|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                {{ form.codigo_postal|as_crispy_field }}
                             </div>
                         </div>
 
                         <div class="d-grid gap-2 mt-4">
-                            <button type="submit" class="btn btn-primary btn-lg shadow">
+                            <button type="submit" class="btn btn-primary btn-lg shadow rounded-pill">
                                 Ir a Pagar <i class="bi bi-arrow-right-circle ms-2"></i>
                             </button>
-                            <a href="{% url 'core:ver_carrito' %}" class="btn btn-link text-secondary">
+                            <a href="{% url 'core:ver_carrito' %}" class="btn btn-link text-secondary text-decoration-none">
                                 Volver al Carrito
                             </a>
                         </div>

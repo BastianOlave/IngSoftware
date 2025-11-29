@@ -1,64 +1,66 @@
 {% extends 'base.html' %}
 
-{% block title %}Atención al Cliente - Notificaciones{% endblock %}
+{% block title %}Atención al Cliente{% endblock %}
 
 {% block content %}
 <div class="container">
     <h2 class="mb-4"><i class="bi bi-headset text-primary"></i> Atención al Cliente</h2>
 
     <div class="row">
-        <div class="col-md-8">
-            <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Notificaciones Internas</h5>
-                    <span class="badge bg-light text-dark">{{ notificaciones|length }} Nuevas</span>
-                </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush">
-                        {% for notif in notificaciones %}
-                        <div class="list-group-item list-group-item-action flex-column align-items-start p-3">
-                            <div class="d-flex w-100 justify-content-between">
-                                <h5 class="mb-1 text-danger">
-                                    <i class="bi bi-exclamation-triangle-fill"></i> Incidencia en Pedido
-                                </h5>
-                                <small class="text-muted">{{ notif.fecha|timesince }} atrás</small>
-                            </div>
-                            <p class="mb-2 mt-2">{{ notif.mensaje }}</p>
-                            <div class="d-flex justify-content-between align-items-center mt-3">
-                                {% if notif.pedido %}
-                                <span class="text-muted small">
-                                    Cliente: <strong>{{ notif.pedido.cliente.nombre }}</strong> | Tel: {{ notif.pedido.cliente.telefono }}
-                                </span>
-                                {% endif %}
+        <div class="col-md-12">
+            {% for notif in notificaciones %}
+            <div class="card mb-3 border-start border-5 {% if notif.estado == 'PENDIENTE' %}border-danger{% else %}border-warning{% endif %} shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <h5 class="card-title text-danger">
+                            <i class="bi bi-exclamation-triangle-fill"></i> Incidencia: Pedido #{{ notif.pedido.id }}
+                        </h5>
+                        <small class="text-muted">{{ notif.fecha|timesince }} atrás</small>
+                    </div>
+                    
+                    <p class="card-text">{{ notif.mensaje }}</p>
+                    
+                    <div class="bg-light p-2 rounded mb-3">
+                        <small>
+                            <strong>Cliente:</strong> {{ notif.pedido.cliente.nombre }} | 
+                            <strong>Tel:</strong> {{ notif.pedido.cliente.telefono }} | 
+                            <strong>Email:</strong> {{ notif.pedido.cliente.email }}
+                        </small>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        
+                        {% if notif.estado == 'PENDIENTE' %}
+                            <a href="{% url 'redactar_correo' notif.id %}" class="btn btn-primary">
+                                <i class="bi bi-envelope"></i> Contactar Cliente
+                            </a>
+                        
+                        {% elif notif.estado == 'ESPERA' %}
+                            <button class="btn btn-secondary" disabled>
+                                <i class="bi bi-clock"></i> Esperando respuesta...
+                            </button>
+                            
+                            <div class="ms-auto">
+                                <span class="me-2 text-muted small">¿El cliente respondió?</span>
                                 
-                                <a href="{% url 'marcar_leido' notif.id %}" class="btn btn-sm btn-outline-secondary">
-                                    <i class="bi bi-check2"></i> Marcar como gestionado
+                                <a href="{% url 'marcar_gestionado' notif.id %}" class="btn btn-outline-success">
+                                    <i class="bi bi-check-lg"></i> Resuelto
+                                </a>
+                                
+                                <a href="{% url 'anular_pedido' notif.id %}" class="btn btn-outline-danger" onclick="return confirm('¿Seguro? Esto devolverá el stock y anulará el pedido.');">
+                                    <i class="bi bi-x-circle"></i> Anular y Reembolsar
                                 </a>
                             </div>
-                        </div>
-                        {% empty %}
-                        <div class="text-center py-5">
-                            <i class="bi bi-emoji-smile fs-1 text-muted"></i>
-                            <p class="mt-3 text-muted">No hay notificaciones pendientes. ¡Todo tranquilo!</p>
-                        </div>
-                        {% endfor %}
+                        {% endif %}
                     </div>
                 </div>
             </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="card bg-light">
-                <div class="card-body">
-                    <h6><i class="bi bi-info-circle"></i> Guía Rápida</h6>
-                    <p class="small text-muted">
-                        Estas notificaciones son generadas automáticamente por el equipo de <strong>Logística</strong> cuando encuentran un problema de stock (HU005).
-                    </p>
-                    <p class="small text-muted">
-                        Tu tarea es contactar al cliente afectado y ofrecerle una solución (cambio de producto o reembolso).
-                    </p>
-                </div>
+            {% empty %}
+            <div class="text-center py-5">
+                <i class="bi bi-emoji-smile fs-1 text-muted"></i>
+                <p class="mt-3 text-muted">No hay incidencias pendientes.</p>
             </div>
+            {% endfor %}
         </div>
     </div>
 </div>

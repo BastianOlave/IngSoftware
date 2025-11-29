@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
-{% load filtros_extra %} {% block title %}Tu Carrito - Vive Sano{% endblock %}
+{% load filtros_extra %}
+
+{% block title %}Tu Carrito - Vive Sano{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
@@ -10,12 +12,12 @@
         <div class="col-md-8">
             <div class="card shadow-sm">
                 <div class="card-body p-0">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
                                 <th>Producto</th>
                                 <th>Precio</th>
-                                <th>Cantidad</th>
+                                <th class="text-center">Cantidad</th>
                                 <th>Total</th>
                                 <th>Acción</th>
                             </tr>
@@ -27,13 +29,27 @@
                                     <div class="fw-bold">{{ item.nombre }}</div>
                                 </td>
                                 <td>{{ item.precio|clp }}</td>
-                                <td>{{ item.cantidad }}</td>
+                                
+                                <td style="width: 150px;">
+                                    <form action="{% url 'core:actualizar' item.producto_id %}" method="POST" id="form-{{ item.producto_id }}">
+                                        {% csrf_token %}
+                                        <input type="number" 
+                                               name="cantidad" 
+                                               class="form-control text-center mx-auto" 
+                                               value="{{ item.cantidad }}" 
+                                               min="0" 
+                                               style="width: 80px;"
+                                               onchange="validarYEnviar(this, '{{ item.producto_id }}', '{{ item.nombre }}')">
+                                    </form>
+                                </td>
+
                                 <td>
                                     {% widthratio item.precio 1 item.cantidad as subtotal %}
                                     {{ subtotal|clp }}
                                 </td>
+                                
                                 <td>
-                                    <a href="{% url 'core:eliminar' item.producto_id %}" class="text-danger">
+                                    <a href="#" onclick="confirmarEliminar('{% url 'core:eliminar' item.producto_id %}', '{{ item.nombre }}')" class="text-danger fs-5">
                                         <i class="bi bi-trash-fill"></i>
                                     </a>
                                 </td>
@@ -44,7 +60,7 @@
                 </div>
             </div>
             <div class="mt-3 text-end">
-                <a href="{% url 'core:limpiar' %}" class="btn btn-outline-danger btn-sm">Vaciar Carrito</a>
+                <a href="{% url 'core:limpiar' %}" class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Estás seguro de vaciar todo el carrito?');">Vaciar Carrito</a>
             </div>
         </div>
 
@@ -76,4 +92,37 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+    // 1. Validar cambio en el input (Si pone 0 -> Confirmar)
+    function validarYEnviar(input, idProducto, nombreProducto) {
+        var cantidad = parseInt(input.value);
+        var form = document.getElementById('form-' + idProducto);
+
+        if (cantidad === 0) {
+            // Si el usuario puso 0, preguntamos si quiere eliminar
+            var confirmar = confirm("¿Estás seguro que deseas eliminar '" + nombreProducto + "' del carrito?");
+            if (confirmar) {
+                form.submit(); // Enviamos el 0 para que el backend lo borre
+            } else {
+                input.value = 1; // Si cancela, devolvemos a 1 (o al valor anterior si guardas estado)
+            }
+        } else if (cantidad < 0) {
+            // Evitar negativos
+            alert("La cantidad no puede ser negativa.");
+            input.value = 1;
+        } else {
+            // Si es un número válido mayor a 0, actualizamos automáticamente
+            form.submit();
+        }
+    }
+
+    // 2. Validar clic en el basurero
+    function confirmarEliminar(url, nombreProducto) {
+        var confirmar = confirm("¿Estás seguro que deseas eliminar '" + nombreProducto + "'?");
+        if (confirmar) {
+            window.location.href = url;
+        }
+    }
+</script>
 {% endblock %}

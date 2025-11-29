@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
+{% load filtros_extra %}
 
-{% load filtros_extra %}{% block title %}Historial de Despachos{% endblock %}
+{% block title %}Historial de Pedidos{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="bi bi-clock-history text-secondary"></i> Historial de Despachos</h2>
+        <h2><i class="bi bi-clock-history text-secondary"></i> Historial de Pedidos</h2>
         <a href="{% url 'dashboard_logistica' %}" class="btn btn-outline-primary">
             <i class="bi bi-arrow-left"></i> Volver a Pendientes
         </a>
@@ -28,15 +29,19 @@
                     </thead>
                     <tbody>
                         {% for pedido in pedidos %}
-                        <tr>
+                        <tr class="{% if 'Anulado' in pedido.estado %}table-danger{% endif %}">
                             <td class="fw-bold">#{{ pedido.id }}</td>
                             <td>{{ pedido.fecha|date:"d/m/Y H:i" }}</td>
                             <td>
-                                {{ pedido.cliente.nombre }} {{ pedido.cliente.apellido }}<br>
+                                {% if pedido.cliente.nombre %}
+                                    <div class="fw-bold">{{ pedido.cliente.nombre }} {{ pedido.cliente.apellido }}</div>
+                                {% else %}
+                                    <div class="text-muted fst-italic">Sin nombre registrado</div>
+                                {% endif %}
                                 <small class="text-muted">{{ pedido.cliente.telefono }}</small>
                             </td>
                             <td>
-                                {{ pedido.cliente.direccion }}<br>
+                                <div>{{ pedido.cliente.direccion }}</div>
                                 <small class="text-muted">{{ pedido.cliente.comuna }}</small>
                             </td>
                             <td>
@@ -46,13 +51,20 @@
                                     <span class="badge bg-secondary">Transferencia / Otro</span>
                                 {% endif %}
                             </td>
-                            <td class="fw-bold">{{ pedido.total|clp }}</td>
-                            <td><span class="badge bg-dark">Despachado</span></td>
+                            <td class="fw-bold text-success">{{ pedido.total|clp }}</td>
+                            <td>
+                                {% if 'Anulado' in pedido.estado %}
+                                    <span class="badge bg-danger">Cancelado / Reembolsado</span>
+                                {% else %}
+                                    <span class="badge bg-dark">Despachado</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
                             <td colspan="7" class="text-center py-5 text-muted">
-                                Aún no hay pedidos despachados.
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                Aún no hay pedidos en el historial.
                             </td>
                         </tr>
                         {% endfor %}

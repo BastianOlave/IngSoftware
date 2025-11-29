@@ -22,6 +22,7 @@ class Cliente(models.Model):
     telefono = models.CharField(max_length=15, blank=True)
     direccion = models.CharField(max_length=255, blank=True)
     comuna = models.CharField(max_length=100, blank=True)
+    codigo_postal = models.CharField(max_length=10, blank=True)
 
     def __str__(self):
         return f"{self.nombre} {self.apellido}"
@@ -58,15 +59,22 @@ class DetallePedido(models.Model):
 # -------------------------------------------------------------------
 
 class Notificacion(models.Model):
-    # Usamos ForeignKey a 'Group' (grupo) de Django para enviar la notificación
-    # al rol correspondiente (ej. 'Atención al Cliente') 
+    # Definimos los estados posibles
+    ESTADOS = [
+        ('PENDIENTE', 'Pendiente de Contacto'),
+        ('ESPERA', 'Esperando Respuesta del Cliente'),
+        ('LISTO', 'Gestionado / Resuelto'),
+        ('CANCELADO', 'Pedido Anulado')
+    ]
+
     destinatario_grupo = models.ForeignKey(Group, on_delete=models.CASCADE)
     mensaje = models.TextField()
     fecha = models.DateTimeField(auto_now_add=True)
-    leido = models.BooleanField(default=False)
     
-    # Vinculamos la notificación a un pedido específico si es necesario
+    # Reemplazamos el booleano 'leido' por este campo de estado
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='PENDIENTE')
+    
     pedido = models.ForeignKey(Pedido, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
-        return f"Notif. para {self.destinatario_grupo.name} - {self.mensaje[:30]}..."
+        return f"{self.estado} - {self.mensaje[:30]}"
