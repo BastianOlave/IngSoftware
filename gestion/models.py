@@ -21,6 +21,7 @@ class Cliente(models.Model):
     email = models.EmailField(unique=True)
     telefono = models.CharField(max_length=15, blank=True)
     direccion = models.CharField(max_length=255, blank=True)
+    comuna = models.CharField(max_length=100, blank=True)
 
     def __str__(self):
         return f"{self.nombre} {self.apellido}"

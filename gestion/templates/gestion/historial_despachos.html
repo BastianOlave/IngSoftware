@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% load filtros_extra %}{% block title %}Historial de Despachos{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-clock-history text-secondary"></i> Historial de Despachos</h2>
+        <a href="{% url 'dashboard_logistica' %}" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left"></i> Volver a Pendientes
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Fecha</th>
+                            <th>Cliente</th>
+                            <th>Dirección de Envío</th>
+                            <th>Medio de Pago</th>
+                            <th>Total</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pedido in pedidos %}
+                        <tr>
+                            <td class="fw-bold">#{{ pedido.id }}</td>
+                            <td>{{ pedido.fecha|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                {{ pedido.cliente.nombre }} {{ pedido.cliente.apellido }}<br>
+                                <small class="text-muted">{{ pedido.cliente.telefono }}</small>
+                            </td>
+                            <td>
+                                {{ pedido.cliente.direccion }}<br>
+                                <small class="text-muted">{{ pedido.cliente.comuna }}</small>
+                            </td>
+                            <td>
+                                {% if 'WebPay' in pedido.estado %}
+                                    <span class="badge bg-success"><i class="bi bi-credit-card"></i> WebPay</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Transferencia / Otro</span>
+                                {% endif %}
+                            </td>
+                            <td class="fw-bold">{{ pedido.total|clp }}</td>
+                            <td><span class="badge bg-dark">Despachado</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                Aún no hay pedidos despachados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

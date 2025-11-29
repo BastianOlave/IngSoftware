@@ -64,3 +64,6 @@ body {
     background-color: #fff;
     border-radius: 12px 12px 0 0;
 }
+select, option, .form-select {
+    font-family: "Segoe UI Emoji", "Segoe UI Symbol", "Apple Color Emoji", "Noto Color Emoji", sans-serif !important;
+}

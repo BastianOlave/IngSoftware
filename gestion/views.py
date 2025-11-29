@@ -81,3 +81,10 @@ def marcar_leido(request, notificacion_id):
     notif.leido = True
     notif.save()
     return redirect('dashboard_atencion')
+
+def historial_despachos(request):
+    # Filtramos solo los pedidos que ya fueron 'Despachados' o 'Pagados'
+    # Ajusta los estados según lo que use tu sistema finalmente
+    pedidos_completados = Pedido.objects.filter(estado__in=['Despachado', 'Pagado (WebPay)']).order_by('-fecha')
+    
+    return render(request, 'gestion/historial_despachos.html', {'pedidos': pedidos_completados})

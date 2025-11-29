@@ -1,42 +1,65 @@
 {% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% load filtros_extra %}
 
 {% block title %}Confirmar Envío - Vive Sano{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
-    <h2 class="mb-4 text-center">📦 Datos de Despacho</h2>
+    <h2 class="mb-4 text-center">📦 Finalizar Compra</h2>
     
     <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white">
-                    Resumen del Pedido
+        <div class="col-md-8">
+            <div class="card shadow border-0">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="mb-0">Datos de Envío y Contacto</h5>
                 </div>
-                <div class="card-body">
-                    <h5 class="card-title">Total a Pagar: <span class="text-success fw-bold">${{ total }}</span></h5>
-                    <p class="card-text text-muted">Estás a un paso de finalizar tu compra.</p>
+                <div class="card-body p-4">
                     
-                    <hr>
+                    <div class="p-3 bg-light border rounded mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Total a Pagar:</span>
+                            <span class="fs-4 fw-bold text-success">{{ total|clp }}</span>
+                        </div>
+                    </div>
 
                     <form method="POST">
                         {% csrf_token %}
                         
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Dirección de Envío</label>
-                            {{ form.direccion }}
-                            <div class="form-text">Indica calle, numeración y comuna.</div>
+                        <h6 class="text-muted mb-3">Información Personal</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.first_name|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.last_name|as_crispy_field }}
+                            </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Teléfono de Contacto</label>
-                            {{ form.telefono }}
+                        <div class="row">
+                            <div class="col-md-4">
+                                {{ form.codigo_pais|as_crispy_field }}
+                            </div>
+                            <div class="col-md-8">
+                                {{ form.telefono|as_crispy_field }}
+                            </div>
+                        </div>
+
+                        <h6 class="text-muted mb-3 mt-3">Dirección de Despacho</h6>
+                        <div class="row">
+                            <div class="col-md-8">
+                                {{ form.direccion|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.comuna|as_crispy_field }}
+                            </div>
                         </div>
 
                         <div class="d-grid gap-2 mt-4">
-                            <button type="submit" class="btn btn-success btn-lg">
-                                Confirmar y Pagar <i class="bi bi-check-circle-fill ms-2"></i>
+                            <button type="submit" class="btn btn-primary btn-lg shadow">
+                                Ir a Pagar <i class="bi bi-arrow-right-circle ms-2"></i>
                             </button>
-                            <a href="{% url 'core:ver_carrito' %}" class="btn btn-outline-secondary">
+                            <a href="{% url 'core:ver_carrito' %}" class="btn btn-link text-secondary">
                                 Volver al Carrito
                             </a>
                         </div>

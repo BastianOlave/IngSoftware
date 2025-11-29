@@ -16,4 +16,7 @@ urlpatterns = [
     path('logout/', views.logout_usuario, name='logout'),
     path('checkout/', views.checkout, name='checkout'),
     path('catalogo/', views.catalogo, name='catalogo'),
+    path('pago/<int:pedido_id>/', views.seleccion_pago, name='seleccion_pago'),
+    path('webpay/iniciar/<int:pedido_id>/', views.iniciar_pago_webpay, name='iniciar_webpay'),
+    path('webpay/retorno/', views.confirmar_pago_webpay, name='webpay_retorno'),
 ]

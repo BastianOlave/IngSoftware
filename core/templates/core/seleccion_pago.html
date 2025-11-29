@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% load filtros_extra %}
+
+{% block title %}Seleccionar Pago - Vive Sano{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <h2 class="text-center mb-4">💳 Selecciona tu medio de pago</h2>
+            
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Resumen del Pedido #{{ pedido.id }}</h5>
+                    <hr>
+                    <p><strong>Cliente:</strong> {{ pedido.cliente.nombre }} {{ pedido.cliente.apellido }}</p>
+                    <p><strong>Dirección:</strong> {{ pedido.cliente.direccion }}, {{ pedido.cliente.comuna }}</p>
+                    <p><strong>Teléfono:</strong> {{ pedido.cliente.telefono }}</p>
+                    <h3 class="text-end text-success fw-bold">Total: {{ pedido.total|clp }}</h3>
+                </div>
+            </div>
+
+            <div class="d-grid gap-3">
+                
+                <form action="{% url 'core:iniciar_webpay' pedido.id %}" method="POST">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-lg w-100 border shadow-sm d-flex align-items-center justify-content-between p-3" style="background-color: #f8f9fa;">
+                        <span class="fw-bold fs-5">Pagar con WebPay Plus</span>
+                        <img src="https://www.transbankdevelopers.cl/public/library/img/svg/logo_webpay_plus.svg" alt="WebPay" height="40">
+                    </button>
+                </form>
+
+                <button class="btn btn-lg w-100 border shadow-sm d-flex align-items-center justify-content-between p-3" style="background-color: #f8f9fa;">
+                    <span class="fw-bold fs-5 text-muted">Transferencia Bancaria</span>
+                    <i class="bi bi-bank fs-2 text-muted"></i>
+                </button>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
