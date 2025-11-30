@@ -96,6 +96,10 @@ def ver_carrito(request):
 # ---------------------------------------------------------
 
 def registro(request):
+    # CORRECCIÓN: Si ya está logueado, al Home
+    if request.user.is_authenticated:
+        return redirect('core:home')
+
     if request.method == 'POST':
         form = RegistroClienteForm(request.POST)
         if form.is_valid():
@@ -107,6 +111,10 @@ def registro(request):
     return render(request, 'core/registro.html', {'form': form})
 
 def login_usuario(request):
+    # CORRECCIÓN: Si ya está logueado, al Home
+    if request.user.is_authenticated:
+        return redirect('core:home')
+
     if request.method == 'POST':
         data = request.POST.copy()
         username = data.get('username')
@@ -222,10 +230,12 @@ def checkout(request):
     if request.method == 'POST':
         form = DatosEnvioForm(request.POST, instance=cliente, user=request.user)
         if form.is_valid():
+            # A) Guardar en USUARIO
             request.user.first_name = form.cleaned_data['first_name']
             request.user.last_name = form.cleaned_data['last_name']
             request.user.save()
 
+            # B) Guardar en CLIENTE
             cliente = form.save(commit=False)
             cliente.nombre = form.cleaned_data['first_name']
             cliente.apellido = form.cleaned_data['last_name']
@@ -236,15 +246,17 @@ def checkout(request):
             cliente.codigo_postal = form.cleaned_data['codigo_postal']
             cliente.save()
 
+            # C) Validar Stock
             for item in carrito.obtener_items():
                 producto_bd = Producto.objects.get(id=item['producto_id'])
                 if producto_bd.stock < item['cantidad']:
                     messages.error(request, f"Sin stock suficiente de {producto_bd.nombre}.")
                     return redirect('core:ver_carrito')
 
-            # Limpieza de pedidos basura
+            # D) Limpiar pedidos pendientes antiguos
             Pedido.objects.filter(cliente=cliente, estado='Pendiente').delete()
 
+            # E) Crear Pedido
             pedido = Pedido.objects.create(
                 cliente=cliente,
                 total=carrito.obtener_total_precio(),
