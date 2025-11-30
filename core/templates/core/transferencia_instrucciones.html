@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load filtros_extra %}
+
+{% block title %}Instrucciones Transferencia{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7">
+            <div class="card shadow-lg border-success">
+                <div class="card-header bg-success text-white text-center py-3">
+                    <h4 class="mb-0"><i class="bi bi-check-circle-fill me-2"></i> ¡Pedido Confirmado!</h4>
+                </div>
+                <div class="card-body p-5">
+                    <h5 class="text-center text-muted mb-4">Tu Pedido #{{ pedido.id }} está reservado</h5>
+                    
+                    <div class="p-3 mb-4 bg-warning-subtle text-warning-emphasis border border-warning rounded text-center fw-bold">
+                        <i class="bi bi-clock-history me-2"></i> Esperando Comprobante
+                    </div>
+
+                    <p class="text-center mb-4">Por favor, realiza la transferencia por el total de <strong class="text-success">{{ pedido.total|clp }}</strong> a la siguiente cuenta:</p>
+                    
+                    <ul class="list-group mb-4 shadow-sm">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Banco:</span> <strong>Banco Estado</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Tipo de Cuenta:</span> <strong>Cuenta Rut / Vista</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Número:</span> <strong>12345678</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Nombre:</span> <strong>Vive Sano SpA</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>RUT:</span> <strong>76.123.456-K</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Correo:</span> <strong>pagos@vivesano.cl</strong>
+                        </li>
+                    </ul>
+
+                    <div class="alert alert-light border text-center">
+                        <small class="text-muted">
+                            Una vez realizada, envía el comprobante a <strong>pagos@vivesano.cl</strong> indicando tu número de pedido (#{{ pedido.id }}).
+                            <br>Si no recibimos el comprobante en 24 horas, el pedido se anulará automáticamente.
+                        </small>
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <a href="{% url 'core:mis_pedidos' %}" class="btn btn-outline-success btn-lg">
+                            Ir a Mis Pedidos <i class="bi bi-arrow-right ms-2"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

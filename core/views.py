@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.contrib import messages
 from django.core.paginator import Paginator
 import time
@@ -14,7 +14,7 @@ from transbank.common.integration_commerce_codes import IntegrationCommerceCodes
 from transbank.common.integration_api_keys import IntegrationApiKeys
 from transbank.common.integration_type import IntegrationType
 
-from gestion.models import Producto, Cliente, Pedido, DetallePedido
+from gestion.models import Producto, Cliente, Pedido, DetallePedido, Notificacion
 from .carrito import Carrito
 from .forms import DatosEnvioForm, RegistroClienteForm, PerfilUsuarioForm
 
@@ -92,11 +92,10 @@ def ver_carrito(request):
     })
 
 # ---------------------------------------------------------
-# VISTAS DE USUARIO (AUTH + PERFIL + PEDIDOS)
+# VISTAS DE USUARIO (AUTH + PERFIL)
 # ---------------------------------------------------------
 
 def registro(request):
-    # CORRECCIÓN: Si ya está logueado, al Home
     if request.user.is_authenticated:
         return redirect('core:home')
 
@@ -111,7 +110,6 @@ def registro(request):
     return render(request, 'core/registro.html', {'form': form})
 
 def login_usuario(request):
-    # CORRECCIÓN: Si ya está logueado, al Home
     if request.user.is_authenticated:
         return redirect('core:home')
 
@@ -207,7 +205,7 @@ def detalle_pedido_cliente(request, pedido_id):
     })
 
 # ---------------------------------------------------------
-# PROCESO DE PAGO (CHECKOUT Y WEBPAY)
+# PROCESO DE PAGO (CHECKOUT + WEBPAY + TRANSFERENCIA)
 # ---------------------------------------------------------
 
 @login_required
@@ -287,6 +285,42 @@ def seleccion_pago(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     return render(request, 'core/seleccion_pago.html', {'pedido': pedido})
 
+# OPCIÓN 1: TRANSFERENCIA BANCARIA (CORREGIDO PARA NO DUPLICAR)
+def iniciar_pago_transferencia(request, pedido_id):
+    pedido = get_object_or_404(Pedido, id=pedido_id)
+    
+    # 1. Cambiar estado
+    pedido.estado = 'Pendiente Pago (Transferencia)'
+    pedido.save()
+    
+    # 2. Notificar a Atención al Cliente (SOLO SI NO EXISTE YA)
+    try:
+        grupo_atencion = Group.objects.get(name='Atencion al cliente')
+        
+        # FIX: Verificamos si ya existe una notificación pendiente para este pedido
+        existe_notificacion = Notificacion.objects.filter(
+            pedido=pedido, 
+            mensaje__contains="TRANSFERENCIA"
+        ).exists()
+
+        if not existe_notificacion:
+            Notificacion.objects.create(
+                destinatario_grupo=grupo_atencion,
+                pedido=pedido,
+                mensaje=f"TRANSFERENCIA: El cliente {pedido.cliente.nombre} seleccionó transferencia. Esperando comprobante.",
+                estado='PENDIENTE'
+            )
+            
+    except Group.DoesNotExist:
+        pass
+    
+    # 3. Limpiar carrito
+    carrito = Carrito(request)
+    carrito.limpiar()
+    
+    return render(request, 'core/transferencia_instrucciones.html', {'pedido': pedido})
+
+# OPCIÓN 2: WEBPAY PLUS
 def iniciar_pago_webpay(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     

@@ -10,13 +10,14 @@ def contadores_globales(request):
     # Solo calculamos si el usuario está logueado y es staff
     if request.user.is_authenticated and request.user.is_staff:
         
-        # 1. Contador para Logística (Pendientes + En Prep + Pagados)
+        # 1. Contador para Logística
+        # CORRECCIÓN: Agregamos 'Pagado (Transferencia)' a la lista de filtros
         if request.user.groups.filter(name='Logistica').exists() or request.user.is_superuser:
             data['cant_logistica'] = Pedido.objects.filter(
-                estado__in=['Pendiente', 'En Preparacion', 'Pagado (WebPay)']
+                estado__in=['Pendiente', 'En Preparacion', 'Pagado (WebPay)', 'Pagado (Transferencia)']
             ).count()
 
-        # 2. Contador para Atención (No resueltos)
+        # 2. Contador para Atención
         if request.user.groups.filter(name='Atencion al cliente').exists() or request.user.is_superuser:
             try:
                 grupo_atencion = Group.objects.get(name='Atencion al cliente')

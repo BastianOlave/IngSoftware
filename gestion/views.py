@@ -4,38 +4,31 @@ from django.contrib import messages
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db.models import Q
-# En lugar de usar el decorador de Django, usamos el nuestro
-# from django.contrib.auth.decorators import user_passes_test 
+# Importamos formularios
 from core.forms import CorreoSoporteForm 
-from .models import Pedido, Notificacion, Producto
 from .forms import CodigoSeguimientoForm
+from .models import Pedido, Notificacion, Producto
 
-# --- DECORADOR DE SEGURIDAD PERSONALIZADO ---
 def staff_required(view_func):
     def wrapper(request, *args, **kwargs):
-        # 1. Si no está logueado, al Login
         if not request.user.is_authenticated:
-            # CORRECCIÓN AQUÍ: Usamos 'core:login' en vez de 'login'
             return redirect('core:login')
-        
-        # 2. Si está logueado pero NO es staff (Cliente normal), al Home
         if not request.user.is_staff:
             messages.error(request, "No tienes permisos para acceder a esa sección.")
             return redirect('core:home')
-            
-        # 3. Si es staff, pasa
         return view_func(request, *args, **kwargs)
     return wrapper
 
-# ---------------------------------------------------------
-# VISTAS PARA EL ENCARGADO DE LOGÍSTICA
-# ---------------------------------------------------------
+# --- LOGÍSTICA ---
 
 @staff_required 
 def dashboard_logistica(request):
-    # Muestra pedidos activos para preparar
+    # Filtro inteligente: Busca todo lo que esté pendiente, pagado o en preparación
+    # Usamos Q para ser flexibles con los nombres de los estados
     pedidos_pendientes = Pedido.objects.filter(
-        estado__in=['Pendiente', 'En Preparacion', 'Pagado (WebPay)']
+        Q(estado='Pendiente') | 
+        Q(estado__icontains='Pagado') | 
+        Q(estado__icontains='En Preparacion')
     ).order_by('fecha')
     
     return render(request, 'gestion/dashboard_logistica.html', {'pedidos': pedidos_pendientes})
@@ -43,9 +36,17 @@ def dashboard_logistica(request):
 @staff_required
 def preparar_pedido(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
-    if pedido.estado in ['Pendiente', 'Pagado (WebPay)']:
-        pedido.estado = 'En Preparacion'
+    
+    # Si el pedido recién entra al flujo de preparación
+    if 'Pagado' in pedido.estado or pedido.estado == 'Pendiente':
+        # CORRECCIÓN: Conservamos el tipo de pago en el estado intermedio
+        if 'Transferencia' in pedido.estado:
+            pedido.estado = 'En Preparacion (Transferencia)'
+        else:
+            pedido.estado = 'En Preparacion (WebPay)'
+            
         pedido.save()
+        
     return render(request, 'gestion/preparar_pedido.html', {'pedido': pedido})
 
 @staff_required
@@ -55,14 +56,18 @@ def confirmar_pedido_listo(request, pedido_id):
     if request.method == 'POST':
         form = CodigoSeguimientoForm(request.POST, instance=pedido)
         if form.is_valid():
-            # 1. Guardar código (se hace automático con form.save commit=False)
             pedido_actualizado = form.save(commit=False)
             
-            # 2. Cambiar estado
-            pedido_actualizado.estado = 'Despachado (WebPay)'
+            # 2. Definir estado final (Ahora sí detectará Transferencia porque lo guardamos en el paso anterior)
+            if 'Transferencia' in pedido.estado:
+                estado_final = 'Despachado (Transferencia)'
+            else:
+                estado_final = 'Despachado (WebPay)'
+            
+            pedido_actualizado.estado = estado_final
             pedido_actualizado.save()
             
-            # 3. Enviar Correo al Cliente
+            # 3. Notificar al cliente
             try:
                 codigo = pedido_actualizado.codigo_seguimiento
                 send_mail(
@@ -74,7 +79,7 @@ def confirmar_pedido_listo(request, pedido_id):
                 )
                 messages.success(request, f"Pedido #{pedido.id} despachado y cliente notificado.")
             except Exception as e:
-                messages.warning(request, f"Pedido despachado, pero falló el envío del correo: {e}")
+                messages.warning(request, f"Pedido despachado, pero falló el envío del correo.")
 
             return redirect('dashboard_logistica')
     else:
@@ -106,9 +111,7 @@ def historial_despachos(request):
     ).order_by('-fecha')
     return render(request, 'gestion/historial_despachos.html', {'pedidos': pedidos_completados})
 
-# ---------------------------------------------------------
-# VISTAS PARA ATENCIÓN AL CLIENTE
-# ---------------------------------------------------------
+# --- ATENCIÓN AL CLIENTE ---
 
 @staff_required
 def dashboard_atencion(request):
@@ -122,6 +125,26 @@ def dashboard_atencion(request):
     return render(request, 'gestion/dashboard_atencion.html', {'notificaciones': notificaciones})
 
 @staff_required
+def confirmar_transferencia(request, notificacion_id):
+    notif = get_object_or_404(Notificacion, id=notificacion_id)
+    pedido = notif.pedido
+    
+    # Descontar stock
+    for detalle in pedido.detalles.all():
+        producto = detalle.producto
+        producto.stock -= detalle.cantidad
+        producto.save()
+    
+    pedido.estado = 'Pagado (Transferencia)'
+    pedido.save()
+    
+    notif.estado = 'LISTO'
+    notif.save()
+    
+    messages.success(request, f"Pago de Pedido #{pedido.id} confirmado. Enviado a Logística.")
+    return redirect('dashboard_atencion')
+
+@staff_required
 def redactar_correo(request, notificacion_id):
     notif = get_object_or_404(Notificacion, id=notificacion_id)
     pedido = notif.pedido
@@ -129,31 +152,22 @@ def redactar_correo(request, notificacion_id):
     if request.method == 'POST':
         form = CorreoSoporteForm(request.POST)
         if form.is_valid():
-            mensaje = form.cleaned_data['mensaje']
-            asunto = form.cleaned_data['asunto']
-            
             try:
-                # Envía el correo (se verá en la terminal de VS Code)
                 send_mail(
-                    subject=asunto,
-                    message=mensaje,
+                    subject=form.cleaned_data['asunto'],
+                    message=form.cleaned_data['mensaje'],
                     from_email=settings.EMAIL_HOST_USER,
                     recipient_list=[pedido.cliente.email],
                     fail_silently=False,
                 )
-                messages.success(request, f"Mensaje enviado correctamente a {pedido.cliente.email}.")
-                
-                # Cambiamos el estado de la notificación
+                messages.success(request, f"Mensaje enviado a {pedido.cliente.email}.")
                 notif.estado = 'ESPERA'
                 notif.save()
-                
             except Exception as e:
-                messages.error(request, "Hubo un error técnico al enviar el correo.")
+                messages.error(request, "Error al enviar correo.")
                 print(e)
-
             return redirect('dashboard_atencion')
     else:
-        # AQUÍ ESTÁ EL MENSAJE PREDEFINIDO COMPLETO
         texto_inicial = (
             f"Estimado/a {pedido.cliente.nombre} {pedido.cliente.apellido},\n\n"
             f"Nos comunicamos con usted respecto a su Pedido #{pedido.id}.\n\n"
@@ -166,7 +180,6 @@ def redactar_correo(request, notificacion_id):
             "Atentamente,\n"
             "Equipo de Atención al Cliente - Vive Sano"
         )
-        
         initial_data = {
             'asunto': f"IMPORTANTE: Información sobre su Pedido #{pedido.id} - Vive Sano",
             'mensaje': texto_inicial
@@ -185,8 +198,12 @@ def marcar_gestionado(request, notificacion_id):
     notif = get_object_or_404(Notificacion, id=notificacion_id)
     pedido = notif.pedido
     
-    # Devolver a logística
-    pedido.estado = 'En Preparacion'
+    # Devolvemos a logística conservando el estado correcto
+    if 'Transferencia' in pedido.estado:
+        pedido.estado = 'En Preparacion (Transferencia)'
+    else:
+        pedido.estado = 'En Preparacion (WebPay)'
+        
     pedido.save()
     
     notif.estado = 'LISTO'
@@ -200,12 +217,13 @@ def anular_pedido(request, notificacion_id):
     notif = get_object_or_404(Notificacion, id=notificacion_id)
     pedido = notif.pedido
     
-    # Devolver Stock
-    for detalle in pedido.detalles.all():
-        producto = detalle.producto
-        producto.stock += detalle.cantidad
-        producto.save()
-        
+    # Devolver stock
+    if 'Pagado' in pedido.estado or 'En Preparacion' in pedido.estado:
+        for detalle in pedido.detalles.all():
+            producto = detalle.producto
+            producto.stock += detalle.cantidad
+            producto.save()
+            
     pedido.estado = 'Anulado / Reembolsado'
     pedido.save()
     

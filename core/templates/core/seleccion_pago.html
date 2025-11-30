@@ -9,14 +9,27 @@
         <div class="col-md-8">
             <h2 class="text-center mb-4">💳 Selecciona tu medio de pago</h2>
             
-            <div class="card shadow-sm mb-4">
-                <div class="card-body">
-                    <h5 class="card-title text-muted">Resumen del Pedido #{{ pedido.id }}</h5>
+            <div class="card shadow-sm mb-4 border-0">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0 text-muted">Resumen del Pedido #{{ pedido.id }}</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-1"><strong>Cliente:</strong> {{ pedido.cliente.nombre }} {{ pedido.cliente.apellido }}</p>
+                            <p class="mb-1"><strong>Teléfono:</strong> {{ pedido.cliente.telefono }}</p>
+                            <p class="mb-1"><strong>Email:</strong> {{ pedido.cliente.email }}</p>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <p class="mb-1"><strong>Dirección:</strong> {{ pedido.cliente.direccion }}</p>
+                            <p class="mb-1"><strong>Comuna:</strong> {{ pedido.cliente.comuna }}</p>
+                        </div>
+                    </div>
                     <hr>
-                    <p><strong>Cliente:</strong> {{ pedido.cliente.nombre }} {{ pedido.cliente.apellido }}</p>
-                    <p><strong>Dirección:</strong> {{ pedido.cliente.direccion }}, {{ pedido.cliente.comuna }}</p>
-                    <p><strong>Teléfono:</strong> {{ pedido.cliente.telefono }}</p>
-                    <h3 class="text-end text-success fw-bold">Total: {{ pedido.total|clp }}</h3>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fs-5">Total a Pagar:</span>
+                        <span class="fs-2 fw-bold text-success">{{ pedido.total|clp }}</span>
+                    </div>
                 </div>
             </div>
 
@@ -24,19 +37,47 @@
                 
                 <form action="{% url 'core:iniciar_webpay' pedido.id %}" method="POST">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-lg w-100 border shadow-sm d-flex align-items-center justify-content-between p-3" style="background-color: #f8f9fa;">
-                        <span class="fw-bold fs-5">Pagar con WebPay Plus</span>
-                        <img src="https://www.transbankdevelopers.cl/public/library/img/svg/logo_webpay_plus.svg" alt="WebPay" height="40">
+                    <button type="submit" class="btn btn-lg w-100 border shadow-sm d-flex align-items-center justify-content-between p-3 btn-pagar-hover" style="background-color: #fff;">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-credit-card-2-front fs-2 text-success me-3"></i>
+                            <div class="text-start">
+                                <div class="fw-bold fs-5 text-dark">Pagar con WebPay Plus</div>
+                                <small class="text-muted">Tarjetas de Crédito, Débito y Prepago</small>
+                            </div>
+                        </div>
+                        <img src="https://www.transbankdevelopers.cl/public/library/img/svg/logo_webpay_plus.svg" alt="WebPay" height="30">
                     </button>
                 </form>
 
-                <button class="btn btn-lg w-100 border shadow-sm d-flex align-items-center justify-content-between p-3" style="background-color: #f8f9fa;">
-                    <span class="fw-bold fs-5 text-muted">Transferencia Bancaria</span>
-                    <i class="bi bi-bank fs-2 text-muted"></i>
-                </button>
+                <a href="{% url 'core:iniciar_transferencia' pedido.id %}" class="btn btn-lg w-100 border shadow-sm d-flex align-items-center justify-content-between p-3 btn-pagar-hover" style="background-color: #fff; text-decoration: none;">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-bank fs-2 text-primary me-3"></i>
+                        <div class="text-start">
+                            <div class="fw-bold fs-5 text-dark">Transferencia Bancaria</div>
+                            <small class="text-muted">Pago manual, requiere comprobante</small>
+                        </div>
+                    </div>
+                    <i class="bi bi-chevron-right text-muted"></i>
+                </a>
 
+            </div>
+            
+            <div class="text-center mt-4">
+                <a href="{% url 'core:ver_carrito' %}" class="text-secondary text-decoration-none">
+                    <i class="bi bi-arrow-left"></i> Volver al Carrito
+                </a>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    /* Efecto hover suave para los botones de pago */
+    .btn-pagar-hover:hover {
+        background-color: #f8f9fa !important;
+        border-color: #198754 !important; /* Borde verde al pasar el mouse */
+        transform: translateY(-2px);
+        transition: all 0.2s ease;
+    }
+</style>
 {% endblock %}
