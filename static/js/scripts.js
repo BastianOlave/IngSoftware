@@ -1,8 +1,8 @@
-/* --- static/js/scripts.js --- */
-
 document.addEventListener('DOMContentLoaded', function() {
     
+    // ---------------------------------------------------------
     // 1. Estilos automáticos para Inputs de Django
+    // ---------------------------------------------------------
     var inputs = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])');
     inputs.forEach(function(input) {
         input.classList.add('form-control');
@@ -13,7 +13,9 @@ document.addEventListener('DOMContentLoaded', function() {
         select.classList.add('form-select');
     });
 
+    // ---------------------------------------------------------
     // 2. Auto-cierre de alertas (10 segundos)
+    // ---------------------------------------------------------
     var alerts = document.querySelectorAll('.alert');
     alerts.forEach(function(alert) {
         setTimeout(function() {
@@ -90,10 +92,51 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-});
+
+    // ---------------------------------------------------------
+    // 6. MOSTRAR/OCULTAR CONTRASEÑA (NUEVO)
+    // ---------------------------------------------------------
+    var passwordInputs = document.querySelectorAll('input[type="password"]');
+
+    passwordInputs.forEach(function(input) {
+        // 1. Crear el contenedor 'input-group' de Bootstrap
+        var wrapper = document.createElement('div');
+        wrapper.className = 'input-group';
+        
+        // 2. Insertar el wrapper antes del input
+        input.parentNode.insertBefore(wrapper, input);
+        
+        // 3. Mover el input dentro del wrapper
+        wrapper.appendChild(input);
+        
+        // 4. Crear el botón del ojo
+        var button = document.createElement('button');
+        button.className = 'btn btn-outline-secondary';
+        button.type = 'button';
+        // Ajustes visuales para bordes redondeados
+        button.style.borderTopRightRadius = "0.375rem"; 
+        button.style.borderBottomRightRadius = "0.375rem";
+        button.innerHTML = '<i class="bi bi-eye"></i>';
+        
+        // 5. Lógica del click
+        button.addEventListener('click', function() {
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.innerHTML = '<i class="bi bi-eye-slash"></i>';
+            } else {
+                input.type = 'password';
+                button.innerHTML = '<i class="bi bi-eye"></i>';
+            }
+        });
+        
+        // 6. Agregar botón al wrapper
+        wrapper.appendChild(button);
+    });
+
+}); // Fin del DOMContentLoaded
 
 // ---------------------------------------------------------
-// 5. FUNCIONES GLOBALES DEL CARRITO (Para usar onclick en HTML)
+// 5. FUNCIONES GLOBALES DEL CARRITO (Fuera del DOMContentLoaded)
 // ---------------------------------------------------------
 
 function validarYEnviar(input, idProducto, nombreProducto) {

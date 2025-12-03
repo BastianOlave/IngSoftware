@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% load filtros_extra %}
+
+{% block title %}Seleccionar Envío - Vive Sano{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="progress mb-4" style="height: 30px;">
+                <div class="progress-bar bg-success fw-bold" role="progressbar" style="width: 75%;" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100">3. Método de Entrega</div>
+            </div>
+
+            <div class="card shadow-lg border-0 rounded-4">
+                <div class="card-header bg-primary text-white text-center py-3 rounded-top-4">
+                    <h4 class="mb-0 fw-bold"><i class="bi bi-truck"></i> ¿Cómo quieres recibir tu compra?</h4>
+                </div>
+                <div class="card-body p-4">
+                    
+                    <h5 class="card-title mb-4">Resumen del Subtotal: <span class="fw-bold text-primary">{{ subtotal|clp }}</span></h5>
+
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        <div class="list-group">
+                            <label class="list-group-item list-group-item-action d-flex align-items-center cursor-pointer p-3 rounded-3 mb-2 border">
+                                <input class="form-check-input me-3 mt-0 fs-4" type="radio" name="opcion_envio" value="retiro" required checked>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-1 fw-bold"><i class="bi bi-shop me-2"></i>Retiro en Tienda</h5>
+                                        <span class="badge bg-success fs-6 fw-normal">Gratis</span>
+                                    </div>
+                                    <small class="text-muted">Puedes retirar en nuestra sucursal de Concepción.</small>
+                                </div>
+                            </label>
+
+                            <label class="list-group-item list-group-item-action d-flex align-items-center cursor-pointer p-3 rounded-3 border">
+                                <input class="form-check-input me-3 mt-0 fs-4" type="radio" name="opcion_envio" value="despacho" required>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-1 fw-bold"><i class="bi bi-house-door me-2"></i>Despacho a Domicilio</h5>
+                                        
+                                        <div>
+                                            {% if aplica_gratis %}
+                                                <span class="text-muted text-decoration-line-through me-2">{{ costo_envio|clp }}</span>
+                                                <span class="badge bg-success fs-6 fw-normal">¡Gratis!</span>
+                                            {% else %}
+                                                <span class="fw-bold">{{ costo_envio|clp }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <small class="text-muted mb-2 d-block">Enviaremos a la dirección ingresada en el paso anterior.</small>
+                                    {% if not aplica_gratis %}
+                                        <small class="text-primary"><i class="bi bi-info-circle"></i> ¡Agrega más productos para obtener envío gratis sobre $25.000!</small>
+                                    {% endif %}
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-sm">
+                                Continuar al Pago <i class="bi bi-chevron-right ms-1"></i>
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .cursor-pointer { cursor: pointer; }
+    .list-group-item-action:hover { background-color: #f8f9fa; }
+    /* Resaltar la opción seleccionada */
+    .input-group-item .form-check-input:checked ~ .flex-grow-1 h5 { color: var(--bs-primary); }
+    .list-group-item:has(.form-check-input:checked) {
+        background-color: #e9ecef;
+        border-color: var(--bs-primary) !important;
+        border-width: 2px;
+    }
+</style>
+{% endblock %}

@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load filtros_extra %} {% block title %}Catálogo - Vive Sano{% endblock %}
+{% load filtros_extra %} 
+
+{% block title %}Catálogo - Vive Sano{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
@@ -11,7 +13,7 @@
         <div class="col">
             <div class="card h-100 shadow-sm border-0 product-card">
                 {% if producto.imagen %}
-                    <img src="{{ producto.imagen.url }}" class="card-img-top" alt="{{ producto.nombre }}">
+                    <img src="{{ producto.imagen.url }}" class="card-img-top p-3" alt="{{ producto.nombre }}" style="height: 250px; object-fit: contain;">
                 {% else %}
                     <div class="bg-light d-flex align-items-center justify-content-center text-muted" style="height: 250px;">
                         <i class="bi bi-image fs-1"></i>
@@ -22,9 +24,22 @@
                     <h5 class="card-title fw-bold">{{ producto.nombre }}</h5>
                     <p class="card-text text-muted small">{{ producto.descripcion|truncatechars:60 }}</p>
                     
-                    <div class="mt-auto d-flex justify-content-between align-items-center">
-                        <span class="fs-4 fw-bold text-success">{{ producto.precio|clp }}</span>
-                        <a href="{% url 'core:detalle' producto.id %}" class="btn btn-outline-success rounded-pill">Ver Detalle</a>
+                    <div class="mt-auto">
+                        <h4 class="fw-bold text-success mb-3">{{ producto.precio|clp }}</h4>
+                        
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'core:detalle' producto.id %}" class="btn btn-outline-secondary btn-sm flex-fill">
+                                Ver Detalle
+                            </a>
+
+                            <form action="{% url 'core:agregar' producto.id %}" method="POST" class="flex-fill">
+                                {% csrf_token %}
+                                <input type="hidden" name="cantidad" value="1">
+                                <button type="submit" class="btn btn-success btn-sm w-100">
+                                    <i class="bi bi-cart-plus-fill"></i> Agregar
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>

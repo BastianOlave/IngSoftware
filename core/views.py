@@ -5,6 +5,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import User, Group
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.utils import timezone
 import time
 
 # Transbank
@@ -28,6 +29,13 @@ def home(request):
 
 def catalogo(request):
     productos_list = Producto.objects.all().order_by('id')
+    
+    # --- LÓGICA DE FILTRADO (Kit Detox) ---
+    categoria_filter = request.GET.get('categoria')
+    if categoria_filter:
+        productos_list = productos_list.filter(categoria__icontains=categoria_filter)
+    # ---------------------------------------
+
     paginator = Paginator(productos_list, 6) 
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -44,14 +52,25 @@ def detalle_producto(request, producto_id):
 def agregar_producto(request, producto_id):
     carrito = Carrito(request)
     producto = get_object_or_404(Producto, id=producto_id)
+
     cantidad = int(request.POST.get('cantidad', 1))
     
     if cantidad > producto.stock:
         messages.error(request, f"No puedes agregar {cantidad}. Solo quedan {producto.stock}.")
-        return redirect('core:detalle', producto_id=producto_id)
+        return redirect(request.META.get('HTTP_REFERER', 'core:detalle'))
     
     carrito.agregar(producto=producto, cantidad=cantidad)
-    return redirect('core:ver_carrito')
+    
+    messages.success(request, f"¡{producto.nombre} agregado al carrito!")
+
+    url_anterior = request.META.get('HTTP_REFERER')
+    
+    # Si existe esa URL, lo devolvemos ahí (ej: Catálogo o Detalle)
+    if url_anterior:
+        return redirect(url_anterior)
+    
+    # Si por alguna razón no existe, lo mandamos al catálogo por defecto
+    return redirect('core:catalogo')
 
 def actualizar_carrito(request, producto_id):
     carrito = Carrito(request)
@@ -205,7 +224,7 @@ def detalle_pedido_cliente(request, pedido_id):
     })
 
 # ---------------------------------------------------------
-# PROCESO DE PAGO (CHECKOUT + WEBPAY + TRANSFERENCIA)
+# PROCESO DE PAGO (CHECKOUT + SELECCIÓN ENVÍO + WEBPAY + TRANSFERENCIA)
 # ---------------------------------------------------------
 
 @login_required
@@ -251,16 +270,22 @@ def checkout(request):
                     messages.error(request, f"Sin stock suficiente de {producto_bd.nombre}.")
                     return redirect('core:ver_carrito')
 
-            # D) Limpiar pedidos pendientes antiguos
-            Pedido.objects.filter(cliente=cliente, estado='Pendiente').delete()
+            # D) RECICLAJE DE PEDIDO (Para no saltar IDs)
+            pedido = Pedido.objects.filter(cliente=cliente, estado='Pendiente').first()
 
-            # E) Crear Pedido
-            pedido = Pedido.objects.create(
-                cliente=cliente,
-                total=carrito.obtener_total_precio(),
-                estado='Pendiente'
-            )
+            if pedido:
+                pedido.fecha = timezone.now()
+                pedido.total = carrito.obtener_total_precio()
+                pedido.save()
+                pedido.detalles.all().delete()
+            else:
+                pedido = Pedido.objects.create(
+                    cliente=cliente,
+                    total=carrito.obtener_total_precio(),
+                    estado='Pendiente'
+                )
 
+            # E) Crear los detalles
             for item in carrito.obtener_items():
                 producto = get_object_or_404(Producto, id=item['producto_id'])
                 DetallePedido.objects.create(
@@ -270,7 +295,7 @@ def checkout(request):
                     precio_unitario=item['precio']
                 )
             
-            return redirect('core:seleccion_pago', pedido_id=pedido.id)
+            return redirect('core:seleccion_envio', pedido_id=pedido.id)
             
     else:
         form = DatosEnvioForm(instance=cliente, user=request.user)
@@ -281,11 +306,47 @@ def checkout(request):
         'total': carrito.obtener_total_precio()
     })
 
+# NUEVA VISTA: Selección de Método de Envío
+@login_required
+def seleccion_envio(request, pedido_id):
+    pedido = get_object_or_404(Pedido, id=pedido_id, cliente__user=request.user)
+    
+    subtotal_productos = pedido.total
+    COSTO_ENVIO_FIJO = 5990
+    UMBRAL_GRATIS = 25000
+
+    aplica_gratis = subtotal_productos > UMBRAL_GRATIS
+
+    if request.method == 'POST':
+        tipo_seleccionado = request.POST.get('opcion_envio') 
+
+        if tipo_seleccionado == 'despacho':
+            pedido.tipo_entrega = 'Despacho'  # <--- GUARDAMOS
+            if not aplica_gratis:
+                pedido.total = subtotal_productos + COSTO_ENVIO_FIJO
+            # Si aplica gratis, el total es el subtotal
+        
+        elif tipo_seleccionado == 'retiro':
+            pedido.tipo_entrega = 'Retiro'    # <--- GUARDAMOS
+            # El retiro es gratis, reseteamos el total al subtotal original
+            pedido.total = subtotal_productos
+
+        pedido.save()
+        return redirect('core:seleccion_pago', pedido_id=pedido.id)
+
+    context = {
+        'pedido': pedido,
+        'subtotal': subtotal_productos,
+        'costo_envio': COSTO_ENVIO_FIJO,
+        'aplica_gratis': aplica_gratis
+    }
+    return render(request, 'core/seleccion_envio.html', context)
+
 def seleccion_pago(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     return render(request, 'core/seleccion_pago.html', {'pedido': pedido})
 
-# OPCIÓN 1: TRANSFERENCIA BANCARIA (CORREGIDO PARA NO DUPLICAR)
+# OPCIÓN 1: TRANSFERENCIA BANCARIA
 def iniciar_pago_transferencia(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     
@@ -293,11 +354,10 @@ def iniciar_pago_transferencia(request, pedido_id):
     pedido.estado = 'Pendiente Pago (Transferencia)'
     pedido.save()
     
-    # 2. Notificar a Atención al Cliente (SOLO SI NO EXISTE YA)
+    # 2. Notificar a Atención al Cliente
     try:
         grupo_atencion = Group.objects.get(name='Atencion al cliente')
         
-        # FIX: Verificamos si ya existe una notificación pendiente para este pedido
         existe_notificacion = Notificacion.objects.filter(
             pedido=pedido, 
             mensaje__contains="TRANSFERENCIA"

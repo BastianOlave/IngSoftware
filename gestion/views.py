@@ -23,12 +23,11 @@ def staff_required(view_func):
 
 @staff_required 
 def dashboard_logistica(request):
-    # Filtro inteligente: Busca todo lo que esté pendiente, pagado o en preparación
-    # Usamos Q para ser flexibles con los nombres de los estados
+    # SEGURIDAD: Eliminamos 'Pendiente' de la lista.
     pedidos_pendientes = Pedido.objects.filter(
-        Q(estado='Pendiente') | 
-        Q(estado__icontains='Pagado') | 
-        Q(estado__icontains='En Preparacion')
+        Q(estado__startswith='Pagado') | 
+        Q(estado__startswith='En Preparacion') |
+        Q(estado='En Espera Faltante')
     ).order_by('fecha')
     
     return render(request, 'gestion/dashboard_logistica.html', {'pedidos': pedidos_pendientes})
@@ -37,9 +36,13 @@ def dashboard_logistica(request):
 def preparar_pedido(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     
-    # Si el pedido recién entra al flujo de preparación
-    if 'Pagado' in pedido.estado or pedido.estado == 'Pendiente':
-        # CORRECCIÓN: Conservamos el tipo de pago en el estado intermedio
+    # SEGURIDAD: Si intentan entrar por URL a un pedido que sigue Pendiente
+    if 'Pendiente' in pedido.estado and 'Pago' not in pedido.estado:
+         messages.error(request, "¡Alto ahí! Ese pedido aún no ha sido pagado.")
+         return redirect('dashboard_logistica')
+
+    # Lógica de cambio de estado
+    if 'Pagado' in pedido.estado:
         if 'Transferencia' in pedido.estado:
             pedido.estado = 'En Preparacion (Transferencia)'
         else:
@@ -53,12 +56,37 @@ def preparar_pedido(request, pedido_id):
 def confirmar_pedido_listo(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     
+    # --- LOGICA AUTOMÁTICA PARA RETIRO ---
+    if pedido.tipo_entrega == 'Retiro':
+        pedido.codigo_seguimiento = "Retiro en Tienda"
+        
+        if 'Transferencia' in pedido.estado:
+            pedido.estado = 'Despachado (Retiro/Transferencia)'
+        else:
+            pedido.estado = 'Despachado (Retiro/WebPay)'
+        
+        pedido.save()
+        
+        try:
+            send_mail(
+                subject=f"¡Tu Pedido #{pedido.id} está listo para retiro! 🛍️",
+                message=f"Hola {pedido.cliente.nombre},\n\nTu pedido ya está listo en nuestra tienda.\n\nPuedes pasar a retirarlo en nuestro horario de atención.\n\n¡Te esperamos!",
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=[pedido.cliente.email],
+                fail_silently=False,
+            )
+            messages.success(request, f"Pedido #{pedido.id} marcado como 'Listo para Retiro'.")
+        except:
+            messages.warning(request, "Pedido listo, pero falló el correo.")
+            
+        return redirect('dashboard_logistica')
+
+    # --- LOGICA NORMAL PARA DESPACHO ---
     if request.method == 'POST':
         form = CodigoSeguimientoForm(request.POST, instance=pedido)
         if form.is_valid():
             pedido_actualizado = form.save(commit=False)
             
-            # 2. Definir estado final (Ahora sí detectará Transferencia porque lo guardamos en el paso anterior)
             if 'Transferencia' in pedido.estado:
                 estado_final = 'Despachado (Transferencia)'
             else:
@@ -67,7 +95,6 @@ def confirmar_pedido_listo(request, pedido_id):
             pedido_actualizado.estado = estado_final
             pedido_actualizado.save()
             
-            # 3. Notificar al cliente
             try:
                 codigo = pedido_actualizado.codigo_seguimiento
                 send_mail(
@@ -92,6 +119,7 @@ def reportar_faltante(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     pedido.estado = 'En Espera Faltante'
     pedido.save()
+    
     try:
         grupo_atencion = Group.objects.get(name='Atencion al cliente')
         Notificacion.objects.create(
@@ -129,7 +157,6 @@ def confirmar_transferencia(request, notificacion_id):
     notif = get_object_or_404(Notificacion, id=notificacion_id)
     pedido = notif.pedido
     
-    # Descontar stock
     for detalle in pedido.detalles.all():
         producto = detalle.producto
         producto.stock -= detalle.cantidad
@@ -198,8 +225,12 @@ def marcar_gestionado(request, notificacion_id):
     notif = get_object_or_404(Notificacion, id=notificacion_id)
     pedido = notif.pedido
     
-    # Devolvemos a logística conservando el estado correcto
-    if 'Transferencia' in pedido.estado:
+    fue_transferencia = Notificacion.objects.filter(
+        pedido=pedido, 
+        mensaje__contains="TRANSFERENCIA"
+    ).exists()
+
+    if fue_transferencia:
         pedido.estado = 'En Preparacion (Transferencia)'
     else:
         pedido.estado = 'En Preparacion (WebPay)'
@@ -217,7 +248,6 @@ def anular_pedido(request, notificacion_id):
     notif = get_object_or_404(Notificacion, id=notificacion_id)
     pedido = notif.pedido
     
-    # Devolver stock
     if 'Pagado' in pedido.estado or 'En Preparacion' in pedido.estado:
         for detalle in pedido.detalles.all():
             producto = detalle.producto

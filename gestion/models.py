@@ -31,17 +31,25 @@ class Pedido(models.Model):
     ESTADO_CHOICES = [
         ('Pendiente', 'Pendiente'),
         ('En Preparacion', 'En Preparación'),
-        ('En Espera Faltante', 'En espera por faltante'), # [cite: 339]
+        ('En Espera Faltante', 'En espera por faltante'), 
         ('Despachado', 'Despachado'),
         ('Entregado', 'Entregado'),
         ('Cancelado', 'Cancelado'),
     ]
 
+    TIPO_ENTREGA_CHOICES = [
+        ('Despacho', 'Despacho a Domicilio'),
+        ('Retiro', 'Retiro en Tienda'),
+    ]
+
     cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True)
     fecha = models.DateTimeField(auto_now_add=True)
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='Pendiente')
-    codigo_seguimiento = models.CharField(max_length=20, blank=True, null=True)
+    estado = models.CharField(max_length=50, choices=ESTADO_CHOICES, default='Pendiente')
+    codigo_seguimiento = models.CharField(max_length=50, blank=True, null=True)
+    
+    # Campo nuevo para diferenciar retiro de despacho
+    tipo_entrega = models.CharField(max_length=20, choices=TIPO_ENTREGA_CHOICES, default='Despacho')
 
     def __str__(self):
         return f"Pedido #{self.id} - {self.cliente.nombre if self.cliente else 'Invitado'}"
@@ -54,10 +62,6 @@ class DetallePedido(models.Model):
     
     def __str__(self):
         return f"{self.cantidad} x {self.producto.nombre} (Pedido #{self.pedido.id})"
-
-# -------------------------------------------------------------------
-# MODELO CLAVE PARA LA HU005 [cite: 339]
-# -------------------------------------------------------------------
 
 class Notificacion(models.Model):
     # Definimos los estados posibles

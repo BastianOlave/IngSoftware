@@ -1,3 +1,4 @@
+from django.db.models import Q
 from gestion.models import Pedido, Notificacion
 from django.contrib.auth.models import Group
 
@@ -11,10 +12,15 @@ def contadores_globales(request):
     if request.user.is_authenticated and request.user.is_staff:
         
         # 1. Contador para Logística
-        # CORRECCIÓN: Agregamos 'Pagado (Transferencia)' a la lista de filtros
         if request.user.groups.filter(name='Logistica').exists() or request.user.is_superuser:
+            
+            # --- CORRECCIÓN AQUÍ ---
+            # Antes contábamos 'Pendiente'. Ahora lo QUITAMOS para que coincida con el Dashboard.
+            # Solo contamos lo que ya está pagado o en proceso.
             data['cant_logistica'] = Pedido.objects.filter(
-                estado__in=['Pendiente', 'En Preparacion', 'Pagado (WebPay)', 'Pagado (Transferencia)']
+                Q(estado__startswith='Pagado') | 
+                Q(estado__startswith='En Preparacion') |
+                Q(estado='En Espera Faltante')
             ).count()
 
         # 2. Contador para Atención
