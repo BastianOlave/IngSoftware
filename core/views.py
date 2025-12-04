@@ -24,17 +24,18 @@ from .forms import DatosEnvioForm, RegistroClienteForm, PerfilUsuarioForm
 # ---------------------------------------------------------
 
 def home(request):
-    productos_destacados = Producto.objects.all()[:4]
+    # CAMBIO: Solo mostramos destacados que tengan stock mayor a 0
+    productos_destacados = Producto.objects.filter(stock__gt=0).order_by('-id')[:4]
     return render(request, 'core/home.html', {'productos': productos_destacados})
 
 def catalogo(request):
-    productos_list = Producto.objects.all().order_by('id')
+    # CAMBIO: Filtro base -> Solo productos con Stock > 0
+    productos_list = Producto.objects.filter(stock__gt=0).order_by('id')
     
-    # --- LÓGICA DE FILTRADO (Kit Detox) ---
+    # Lógica de Filtrado por Categoría (Ej: Kit Detox)
     categoria_filter = request.GET.get('categoria')
     if categoria_filter:
         productos_list = productos_list.filter(categoria__icontains=categoria_filter)
-    # ---------------------------------------
 
     paginator = Paginator(productos_list, 6) 
     page_number = request.GET.get('page')
@@ -65,11 +66,9 @@ def agregar_producto(request, producto_id):
 
     url_anterior = request.META.get('HTTP_REFERER')
     
-    # Si existe esa URL, lo devolvemos ahí (ej: Catálogo o Detalle)
     if url_anterior:
         return redirect(url_anterior)
     
-    # Si por alguna razón no existe, lo mandamos al catálogo por defecto
     return redirect('core:catalogo')
 
 def actualizar_carrito(request, producto_id):
@@ -171,6 +170,9 @@ def perfil_usuario(request):
             cliente.apellido = form.cleaned_data['last_name']
             cliente.email = form.cleaned_data['email']
             
+            # Guardamos RUT
+            cliente.rut = form.cleaned_data['rut']
+            
             codigo = form.cleaned_data['codigo_pais']
             numero = form.cleaned_data['telefono']
             cliente.telefono = f"{codigo}{numero}"
@@ -224,7 +226,7 @@ def detalle_pedido_cliente(request, pedido_id):
     })
 
 # ---------------------------------------------------------
-# PROCESO DE PAGO (CHECKOUT + SELECCIÓN ENVÍO + WEBPAY + TRANSFERENCIA)
+# PROCESO DE PAGO
 # ---------------------------------------------------------
 
 @login_required
@@ -247,15 +249,16 @@ def checkout(request):
     if request.method == 'POST':
         form = DatosEnvioForm(request.POST, instance=cliente, user=request.user)
         if form.is_valid():
-            # A) Guardar en USUARIO
             request.user.first_name = form.cleaned_data['first_name']
             request.user.last_name = form.cleaned_data['last_name']
             request.user.save()
 
-            # B) Guardar en CLIENTE
             cliente = form.save(commit=False)
             cliente.nombre = form.cleaned_data['first_name']
             cliente.apellido = form.cleaned_data['last_name']
+            
+            # Guardamos RUT
+            cliente.rut = form.cleaned_data['rut']
             
             codigo = form.cleaned_data['codigo_pais']
             numero = form.cleaned_data['telefono']
@@ -263,14 +266,14 @@ def checkout(request):
             cliente.codigo_postal = form.cleaned_data['codigo_postal']
             cliente.save()
 
-            # C) Validar Stock
+            # Validar Stock
             for item in carrito.obtener_items():
                 producto_bd = Producto.objects.get(id=item['producto_id'])
                 if producto_bd.stock < item['cantidad']:
                     messages.error(request, f"Sin stock suficiente de {producto_bd.nombre}.")
                     return redirect('core:ver_carrito')
 
-            # D) RECICLAJE DE PEDIDO (Para no saltar IDs)
+            # RECICLAJE DE PEDIDO (No saltar IDs)
             pedido = Pedido.objects.filter(cliente=cliente, estado='Pendiente').first()
 
             if pedido:
@@ -285,7 +288,7 @@ def checkout(request):
                     estado='Pendiente'
                 )
 
-            # E) Crear los detalles
+            # Crear detalles
             for item in carrito.obtener_items():
                 producto = get_object_or_404(Producto, id=item['producto_id'])
                 DetallePedido.objects.create(
@@ -295,6 +298,7 @@ def checkout(request):
                     precio_unitario=item['precio']
                 )
             
+            # Redirigir a Selección de Envío
             return redirect('core:seleccion_envio', pedido_id=pedido.id)
             
     else:
@@ -306,7 +310,6 @@ def checkout(request):
         'total': carrito.obtener_total_precio()
     })
 
-# NUEVA VISTA: Selección de Método de Envío
 @login_required
 def seleccion_envio(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id, cliente__user=request.user)
@@ -314,22 +317,20 @@ def seleccion_envio(request, pedido_id):
     subtotal_productos = pedido.total
     COSTO_ENVIO_FIJO = 5990
     UMBRAL_GRATIS = 25000
-
     aplica_gratis = subtotal_productos > UMBRAL_GRATIS
 
     if request.method == 'POST':
         tipo_seleccionado = request.POST.get('opcion_envio') 
 
         if tipo_seleccionado == 'despacho':
-            pedido.tipo_entrega = 'Despacho'  # <--- GUARDAMOS
+            pedido.tipo_entrega = 'Despacho'
             if not aplica_gratis:
                 pedido.total = subtotal_productos + COSTO_ENVIO_FIJO
-            # Si aplica gratis, el total es el subtotal
+            # Si aplica gratis, el total sigue siendo el subtotal
         
         elif tipo_seleccionado == 'retiro':
-            pedido.tipo_entrega = 'Retiro'    # <--- GUARDAMOS
-            # El retiro es gratis, reseteamos el total al subtotal original
-            pedido.total = subtotal_productos
+            pedido.tipo_entrega = 'Retiro'
+            pedido.total = subtotal_productos # Retiro es gratis
 
         pedido.save()
         return redirect('core:seleccion_pago', pedido_id=pedido.id)
@@ -346,57 +347,41 @@ def seleccion_pago(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     return render(request, 'core/seleccion_pago.html', {'pedido': pedido})
 
-# OPCIÓN 1: TRANSFERENCIA BANCARIA
 def iniciar_pago_transferencia(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
-    
-    # 1. Cambiar estado
     pedido.estado = 'Pendiente Pago (Transferencia)'
     pedido.save()
     
-    # 2. Notificar a Atención al Cliente
     try:
         grupo_atencion = Group.objects.get(name='Atencion al cliente')
-        
-        existe_notificacion = Notificacion.objects.filter(
-            pedido=pedido, 
-            mensaje__contains="TRANSFERENCIA"
-        ).exists()
-
-        if not existe_notificacion:
+        existe = Notificacion.objects.filter(pedido=pedido, mensaje__contains="TRANSFERENCIA").exists()
+        if not existe:
             Notificacion.objects.create(
                 destinatario_grupo=grupo_atencion,
                 pedido=pedido,
                 mensaje=f"TRANSFERENCIA: El cliente {pedido.cliente.nombre} seleccionó transferencia. Esperando comprobante.",
                 estado='PENDIENTE'
             )
-            
     except Group.DoesNotExist:
         pass
     
-    # 3. Limpiar carrito
     carrito = Carrito(request)
     carrito.limpiar()
     
     return render(request, 'core/transferencia_instrucciones.html', {'pedido': pedido})
 
-# OPCIÓN 2: WEBPAY PLUS
 def iniciar_pago_webpay(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
-    
     tx = Transaction(WebpayOptions(
         IntegrationCommerceCodes.WEBPAY_PLUS, 
         IntegrationApiKeys.WEBPAY, 
         IntegrationType.TEST
     ))
-    
     buy_order = f"P-{pedido.id}-{int(time.time())}"
     session_id = f"S-{request.user.id}-{int(time.time())}"
     amount = int(pedido.total)
     return_url = request.build_absolute_uri('/webpay/retorno/') 
-    
     response = tx.create(buy_order, session_id, amount, return_url)
-    
     return redirect(response['url'] + '?token_ws=' + response['token'])
 
 def confirmar_pago_webpay(request):
@@ -412,20 +397,18 @@ def confirmar_pago_webpay(request):
             IntegrationType.TEST
         ))
         response = tx.commit(token)
-        
         if response['response_code'] == 0:
-            buy_order_completo = response['buy_order']
-            pedido_id = buy_order_completo.split('-')[1]
-            
+            buy_order = response['buy_order']
+            pedido_id = buy_order.split('-')[1]
             pedido = Pedido.objects.get(id=pedido_id)
             pedido.estado = 'Pagado (WebPay)'
             pedido.save()
             
             carrito = Carrito(request)
             for item in carrito.obtener_items():
-                producto = get_object_or_404(Producto, id=item['producto_id'])
-                producto.stock -= item['cantidad']
-                producto.save()
+                prod = get_object_or_404(Producto, id=item['producto_id'])
+                prod.stock -= item['cantidad']
+                prod.save()
             
             carrito.limpiar()
             messages.success(request, "¡Pago exitoso con WebPay!")

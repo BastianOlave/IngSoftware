@@ -20,6 +20,10 @@
                             <div class="col-md-6 mb-2">{{ form.first_name|as_crispy_field }}</div>
                             <div class="col-md-6 mb-2">{{ form.last_name|as_crispy_field }}</div>
                         </div>
+                        
+                        <!-- AQUÍ AGREGAMOS EL RUT -->
+                        <div class="mb-2">{{ form.rut|as_crispy_field }}</div>
+                        
                         <div class="mb-3">{{ form.email|as_crispy_field }}</div>
 
                         <h5 class="text-muted mb-3 mt-4">Datos de Contacto</h5>

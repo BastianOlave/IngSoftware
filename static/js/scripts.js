@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ---------------------------------------------------------
-    // 6. MOSTRAR/OCULTAR CONTRASEÑA (NUEVO)
+    // 6. MOSTRAR/OCULTAR CONTRASEÑA
     // ---------------------------------------------------------
     var passwordInputs = document.querySelectorAll('input[type="password"]');
 
@@ -131,6 +131,27 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 6. Agregar botón al wrapper
         wrapper.appendChild(button);
+    });
+
+    // ---------------------------------------------------------
+    // 7. FORMATO RUT CHILENO AUTOMÁTICO (NUEVO)
+    // ---------------------------------------------------------
+    // Detecta cualquier input con la clase 'rut-input' y le da formato
+    document.addEventListener('input', function (e) {
+        if (e.target.classList.contains('rut-input')) {
+            // Eliminar caracteres no válidos
+            let rut = e.target.value.replace(/[^0-9kK]/g, '').toUpperCase();
+            
+            if (rut.length > 1) {
+                // Separar cuerpo y dígito verificador
+                const cuerpo = rut.slice(0, -1);
+                const dv = rut.slice(-1);
+                // Agregar puntos
+                e.target.value = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + "-" + dv;
+            } else {
+                e.target.value = rut;
+            }
+        }
     });
 
 }); // Fin del DOMContentLoaded

@@ -11,7 +11,16 @@
     <div class="row row-cols-1 row-cols-md-3 g-4">
         {% for producto in page_obj %}
         <div class="col">
-            <div class="card h-100 shadow-sm border-0 product-card">
+            <!-- Añadimos position-relative para poder colocar el badge de stock -->
+            <div class="card h-100 shadow-sm border-0 product-card position-relative">
+                
+                <!-- BADGE DE STOCK -->
+                <div class="position-absolute top-0 end-0 m-2">
+                    <span class="badge bg-secondary opacity-75 shadow-sm">
+                        Stock: {{ producto.stock }}
+                    </span>
+                </div>
+
                 {% if producto.imagen %}
                     <img src="{{ producto.imagen.url }}" class="card-img-top p-3" alt="{{ producto.nombre }}" style="height: 250px; object-fit: contain;">
                 {% else %}
@@ -44,14 +53,21 @@
                 </div>
             </div>
         </div>
+        {% empty %}
+        <div class="col-12 text-center py-5">
+            <div class="alert alert-light text-muted" role="alert">
+                <i class="bi bi-basket me-2"></i> No hay productos disponibles en este momento.
+            </div>
+        </div>
         {% endfor %}
     </div>
 
+    <!-- Paginación -->
     <nav class="mt-5">
         <ul class="pagination justify-content-center">
             {% if page_obj.has_previous %}
                 <li class="page-item">
-                    <a class="page-link text-success" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+                    <a class="page-link text-success" href="?page={{ page_obj.previous_page_number }}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}">Anterior</a>
                 </li>
             {% else %}
                 <li class="page-item disabled"><span class="page-link">Anterior</span></li>
@@ -63,7 +79,7 @@
 
             {% if page_obj.has_next %}
                 <li class="page-item">
-                    <a class="page-link text-success" href="?page={{ page_obj.next_page_number }}">Siguiente</a>
+                    <a class="page-link text-success" href="?page={{ page_obj.next_page_number }}{% if request.GET.categoria %}&categoria={{ request.GET.categoria }}{% endif %}">Siguiente</a>
                 </li>
             {% else %}
                 <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
