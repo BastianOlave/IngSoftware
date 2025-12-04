@@ -39,9 +39,11 @@ class Pedido(models.Model):
         ('Despachado', 'Despachado'),
         ('Entregado', 'Entregado'),
         ('Cancelado', 'Cancelado'),
+        ('Reserva Pendiente', 'Reserva Solicitada a Soporte'),
+        ('Reserva En Camino', 'Producto Solicitado al Proveedor'),
+        ('Reserva Disponible', 'Disponible para Pago'),
     ]
 
-    # --- NUEVO CAMPO TIPO DE ENTREGA ---
     TIPO_ENTREGA_CHOICES = [
         ('Despacho', 'Despacho a Domicilio'),
         ('Retiro', 'Retiro en Tienda'),
@@ -50,11 +52,8 @@ class Pedido(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True)
     fecha = models.DateTimeField(auto_now_add=True)
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    
     estado = models.CharField(max_length=50, choices=ESTADO_CHOICES, default='Pendiente')
     codigo_seguimiento = models.CharField(max_length=50, blank=True, null=True)
-    
-    # Campo para guardar si es Retiro o Despacho
     tipo_entrega = models.CharField(max_length=20, choices=TIPO_ENTREGA_CHOICES, default='Despacho')
 
     def __str__(self):

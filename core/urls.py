@@ -25,4 +25,5 @@ urlpatterns = [
     path('mis-pedidos/', views.mis_pedidos, name='mis_pedidos'),
     path('mis-pedidos/detalle/<int:pedido_id>/', views.detalle_pedido_cliente, name='detalle_pedido_cliente'),
     path('pago/transferencia/<int:pedido_id>/', views.iniciar_pago_transferencia, name='iniciar_transferencia'),
+    path('reservar/<int:producto_id>/', views.reservar_producto, name='reservar_producto'),
 ]

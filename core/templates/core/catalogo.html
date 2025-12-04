@@ -11,18 +11,24 @@
     <div class="row row-cols-1 row-cols-md-3 g-4">
         {% for producto in page_obj %}
         <div class="col">
-            <!-- Añadimos position-relative para poder colocar el badge de stock -->
             <div class="card h-100 shadow-sm border-0 product-card position-relative">
                 
                 <!-- BADGE DE STOCK -->
                 <div class="position-absolute top-0 end-0 m-2">
-                    <span class="badge bg-secondary opacity-75 shadow-sm">
-                        Stock: {{ producto.stock }}
-                    </span>
+                    {% if producto.stock > 0 %}
+                        <span class="badge bg-secondary opacity-75 shadow-sm">
+                            Stock: {{ producto.stock }}
+                        </span>
+                    {% else %}
+                        <span class="badge bg-danger shadow-sm">
+                            Sin Stock
+                        </span>
+                    {% endif %}
                 </div>
 
+                <!-- Imagen (con opacidad si no hay stock para efecto visual) -->
                 {% if producto.imagen %}
-                    <img src="{{ producto.imagen.url }}" class="card-img-top p-3" alt="{{ producto.nombre }}" style="height: 250px; object-fit: contain;">
+                    <img src="{{ producto.imagen.url }}" class="card-img-top p-3 {% if producto.stock == 0 %}opacity-50{% endif %}" alt="{{ producto.nombre }}" style="height: 250px; object-fit: contain;">
                 {% else %}
                     <div class="bg-light d-flex align-items-center justify-content-center text-muted" style="height: 250px;">
                         <i class="bi bi-image fs-1"></i>
@@ -37,17 +43,28 @@
                         <h4 class="fw-bold text-success mb-3">{{ producto.precio|clp }}</h4>
                         
                         <div class="d-flex gap-2">
+                            <!-- Botón Ver Detalle (Siempre disponible) -->
                             <a href="{% url 'core:detalle' producto.id %}" class="btn btn-outline-secondary btn-sm flex-fill">
                                 Ver Detalle
                             </a>
 
-                            <form action="{% url 'core:agregar' producto.id %}" method="POST" class="flex-fill">
-                                {% csrf_token %}
-                                <input type="hidden" name="cantidad" value="1">
-                                <button type="submit" class="btn btn-success btn-sm w-100">
-                                    <i class="bi bi-cart-plus-fill"></i> Agregar
-                                </button>
-                            </form>
+                            <!-- LÓGICA DE BOTONES -->
+                            {% if producto.stock > 0 %}
+                                <!-- CASO CON STOCK: Agregar al Carrito -->
+                                <form action="{% url 'core:agregar' producto.id %}" method="POST" class="flex-fill">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="cantidad" value="1">
+                                    <button type="submit" class="btn btn-success btn-sm w-100">
+                                        <i class="bi bi-cart-plus-fill"></i> Agregar
+                                    </button>
+                                </form>
+                            {% else %}
+                                <!-- CASO SIN STOCK: Reservar -->
+                                <!-- Usamos un formulario simple para ir a la vista de reserva -->
+                                <a href="{% url 'core:reservar_producto' producto.id %}" class="btn btn-primary btn-sm w-100 flex-fill">
+                                    <i class="bi bi-calendar-check"></i> Reservar
+                                </a>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -62,7 +79,7 @@
         {% endfor %}
     </div>
 
-    <!-- Paginación -->
+    <!-- Paginación se mantiene igual -->
     <nav class="mt-5">
         <ul class="pagination justify-content-center">
             {% if page_obj.has_previous %}

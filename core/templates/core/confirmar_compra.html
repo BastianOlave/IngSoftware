@@ -6,19 +6,20 @@
 
 {% block content %}
 <div class="container mt-5">
-    <h2 class="mb-4 text-center">📦 Finalizar Compra</h2>
+    <h2 class="mb-4 text-center fw-bold text-success">📦 Finalizar Compra</h2>
     
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card shadow border-0">
-                <div class="card-header bg-primary text-white py-3">
-                    <h5 class="mb-0">Datos de Envío y Contacto</h5>
+                <!-- CABECERA VERDE (bg-success) -->
+                <div class="card-header bg-success text-white py-3">
+                    <h5 class="mb-0 fw-bold">Datos de Envío y Contacto</h5>
                 </div>
                 <div class="card-body p-4">
                     
                     <div class="p-3 bg-light border rounded mb-4">
                         <div class="d-flex justify-content-between align-items-center">
-                            <span>Total a Pagar:</span>
+                            <span class="fw-bold text-secondary">Total a Pagar:</span>
                             <span class="fs-4 fw-bold text-success">{{ total|clp }}</span>
                         </div>
                     </div>
@@ -26,7 +27,7 @@
                     <form method="POST">
                         {% csrf_token %}
                         
-                        <h6 class="text-muted mb-3">Información Personal</h6>
+                        <h6 class="text-success mb-3 fw-bold border-bottom pb-2">Información Personal</h6>
                         <div class="row">
                             <div class="col-md-6 mb-2">
                                 {{ form.first_name|as_crispy_field }}
@@ -36,7 +37,7 @@
                             </div>
                         </div>
 
-                        <!-- AQUÍ AGREGAMOS EL RUT -->
+                        <!-- RUT -->
                         <div class="row">
                             <div class="col-md-12 mb-2">
                                 {{ form.rut|as_crispy_field }}
@@ -52,7 +53,7 @@
                             </div>
                         </div>
 
-                        <h6 class="text-muted mb-3 mt-3">Dirección de Despacho</h6>
+                        <h6 class="text-success mb-3 mt-4 fw-bold border-bottom pb-2">Dirección de Despacho</h6>
                         <div class="row">
                             <div class="col-md-12 mb-2">
                                 {{ form.direccion|as_crispy_field }}
@@ -68,10 +69,11 @@
                         </div>
 
                         <div class="d-grid gap-2 mt-4">
-                            <button type="submit" class="btn btn-primary btn-lg shadow rounded-pill">
+                            <!-- BOTÓN VERDE (btn-success) -->
+                            <button type="submit" class="btn btn-success btn-lg shadow rounded-pill fw-bold">
                                 Ir a Pagar <i class="bi bi-arrow-right-circle ms-2"></i>
                             </button>
-                            <a href="{% url 'core:ver_carrito' %}" class="btn btn-link text-secondary text-decoration-none">
+                            <a href="{% url 'core:ver_carrito' %}" class="btn btn-outline-secondary text-decoration-none">
                                 Volver al Carrito
                             </a>
                         </div>

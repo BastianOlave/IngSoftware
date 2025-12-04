@@ -24,15 +24,12 @@ from .forms import DatosEnvioForm, RegistroClienteForm, PerfilUsuarioForm
 # ---------------------------------------------------------
 
 def home(request):
-    # CAMBIO: Solo mostramos destacados que tengan stock mayor a 0
-    productos_destacados = Producto.objects.filter(stock__gt=0).order_by('-id')[:4]
+    productos_destacados = Producto.objects.all().order_by('-id')[:4]
     return render(request, 'core/home.html', {'productos': productos_destacados})
 
 def catalogo(request):
-    # CAMBIO: Filtro base -> Solo productos con Stock > 0
-    productos_list = Producto.objects.filter(stock__gt=0).order_by('id')
+    productos_list = Producto.objects.all().order_by('id')
     
-    # Lógica de Filtrado por Categoría (Ej: Kit Detox)
     categoria_filter = request.GET.get('categoria')
     if categoria_filter:
         productos_list = productos_list.filter(categoria__icontains=categoria_filter)
@@ -54,13 +51,27 @@ def agregar_producto(request, producto_id):
     carrito = Carrito(request)
     producto = get_object_or_404(Producto, id=producto_id)
 
-    cantidad = int(request.POST.get('cantidad', 1))
+    cantidad_solicitada = int(request.POST.get('cantidad', 1))
     
-    if cantidad > producto.stock:
-        messages.error(request, f"No puedes agregar {cantidad}. Solo quedan {producto.stock}.")
+    # --- LÓGICA DE VALIDACIÓN DE STOCK CORREGIDA ---
+    # 1. Obtenemos cuánto tiene ya este usuario en su carrito
+    producto_id_str = str(producto.id)
+    cantidad_en_carrito = 0
+    
+    if producto_id_str in carrito.carrito:
+        cantidad_en_carrito = carrito.carrito[producto_id_str]['cantidad']
+    
+    # 2. Sumamos lo que tiene + lo que quiere agregar
+    total_final = cantidad_en_carrito + cantidad_solicitada
+
+    # 3. Validamos contra el stock real
+    if total_final > producto.stock:
+        messages.error(request, f"No hay suficiente stock. Ya tienes {cantidad_en_carrito} en el carrito y solo quedan {producto.stock} disponibles en total.")
+        # Devolvemos al usuario a donde estaba
         return redirect(request.META.get('HTTP_REFERER', 'core:detalle'))
     
-    carrito.agregar(producto=producto, cantidad=cantidad)
+    # Si pasa la validación, agregamos
+    carrito.agregar(producto=producto, cantidad=cantidad_solicitada)
     
     messages.success(request, f"¡{producto.nombre} agregado al carrito!")
 
@@ -170,7 +181,6 @@ def perfil_usuario(request):
             cliente.apellido = form.cleaned_data['last_name']
             cliente.email = form.cleaned_data['email']
             
-            # Guardamos RUT
             cliente.rut = form.cleaned_data['rut']
             
             codigo = form.cleaned_data['codigo_pais']
@@ -204,25 +214,28 @@ def detalle_pedido_cliente(request, pedido_id):
         return redirect('core:home')
 
     estado_actual = pedido.estado
+    
+    # Lógica de barra de progreso estándar
     progreso = {
         'recibido': True,
         'pagado': False,
         'preparacion': False,
         'despachado': False
     }
-    
     if 'Pagado' in estado_actual or 'Preparacion' in estado_actual or 'Despachado' in estado_actual:
         progreso['pagado'] = True
-    
     if 'Preparacion' in estado_actual or 'Despachado' in estado_actual:
         progreso['preparacion'] = True
-        
     if 'Despachado' in estado_actual:
         progreso['despachado'] = True
 
+    # Detectar si es una reserva habilitada para pagar
+    es_reserva_pagable = (estado_actual == 'Reserva Disponible')
+
     return render(request, 'core/detalle_pedido_cliente.html', {
         'pedido': pedido,
-        'progreso': progreso
+        'progreso': progreso,
+        'es_reserva_pagable': es_reserva_pagable # Variable nueva para el template
     })
 
 # ---------------------------------------------------------
@@ -256,8 +269,6 @@ def checkout(request):
             cliente = form.save(commit=False)
             cliente.nombre = form.cleaned_data['first_name']
             cliente.apellido = form.cleaned_data['last_name']
-            
-            # Guardamos RUT
             cliente.rut = form.cleaned_data['rut']
             
             codigo = form.cleaned_data['codigo_pais']
@@ -266,7 +277,7 @@ def checkout(request):
             cliente.codigo_postal = form.cleaned_data['codigo_postal']
             cliente.save()
 
-            # Validar Stock
+            # Validar Stock (Ultima verificacion antes de avanzar)
             for item in carrito.obtener_items():
                 producto_bd = Producto.objects.get(id=item['producto_id'])
                 if producto_bd.stock < item['cantidad']:
@@ -288,7 +299,6 @@ def checkout(request):
                     estado='Pendiente'
                 )
 
-            # Crear detalles
             for item in carrito.obtener_items():
                 producto = get_object_or_404(Producto, id=item['producto_id'])
                 DetallePedido.objects.create(
@@ -298,7 +308,6 @@ def checkout(request):
                     precio_unitario=item['precio']
                 )
             
-            # Redirigir a Selección de Envío
             return redirect('core:seleccion_envio', pedido_id=pedido.id)
             
     else:
@@ -326,11 +335,10 @@ def seleccion_envio(request, pedido_id):
             pedido.tipo_entrega = 'Despacho'
             if not aplica_gratis:
                 pedido.total = subtotal_productos + COSTO_ENVIO_FIJO
-            # Si aplica gratis, el total sigue siendo el subtotal
-        
+            
         elif tipo_seleccionado == 'retiro':
             pedido.tipo_entrega = 'Retiro'
-            pedido.total = subtotal_productos # Retiro es gratis
+            pedido.total = subtotal_productos
 
         pedido.save()
         return redirect('core:seleccion_pago', pedido_id=pedido.id)
@@ -420,3 +428,45 @@ def confirmar_pago_webpay(request):
         print(f"Error Webpay: {e}")
         messages.error(request, "Ocurrió un error técnico al confirmar el pago.")
         return redirect('core:home')
+    
+@login_required
+def reservar_producto(request, producto_id):
+    producto = get_object_or_404(Producto, id=producto_id)
+    
+    # Verificar que el usuario tenga perfil de cliente
+    try:
+        cliente = Cliente.objects.get(user=request.user)
+    except Cliente.DoesNotExist:
+        messages.error(request, "Completa tu perfil antes de reservar.")
+        return redirect('core:perfil')
+
+    # Crear un Pedido especial de Reserva
+    pedido_reserva = Pedido.objects.create(
+        cliente=cliente,
+        total=producto.precio, # Precio actual
+        estado='Reserva Pendiente',
+        tipo_entrega='Despacho' # Por defecto, luego se puede cambiar
+    )
+
+    # Crear el detalle
+    DetallePedido.objects.create(
+        pedido=pedido_reserva,
+        producto=producto,
+        cantidad=1,
+        precio_unitario=producto.precio
+    )
+
+    # Notificar a Atención al Cliente
+    try:
+        grupo_atencion = Group.objects.get(name='Atencion al cliente')
+        Notificacion.objects.create(
+            destinatario_grupo=grupo_atencion,
+            pedido=pedido_reserva,
+            mensaje=f"SOLICITUD RESERVA: El cliente {cliente.nombre} solicita stock de {producto.nombre}.",
+            estado='PENDIENTE'
+        )
+    except Group.DoesNotExist:
+        pass
+
+    messages.success(request, f"Solicitud de reserva enviada para {producto.nombre}. Te notificaremos cuando llegue.")
+    return redirect('core:mis_pedidos')
