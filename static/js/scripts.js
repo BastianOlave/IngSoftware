@@ -1,8 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-    
-    // ---------------------------------------------------------
-    // 1. Estilos automáticos para Inputs de Django
-    // ---------------------------------------------------------
+
     var inputs = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])');
     inputs.forEach(function(input) {
         input.classList.add('form-control');
@@ -13,78 +10,58 @@ document.addEventListener('DOMContentLoaded', function() {
         select.classList.add('form-select');
     });
 
-    // ---------------------------------------------------------
-    // 2. Auto-cierre de alertas (10 segundos)
-    // ---------------------------------------------------------
-    var alerts = document.querySelectorAll('.alert');
+    var alerts = document.querySelectorAll('.alert:not(.alert-permanent)');
     alerts.forEach(function(alert) {
         setTimeout(function() {
             var bsAlert = new bootstrap.Alert(alert);
             bsAlert.close();
-        }, 10000); 
+        }, 10000);
     });
 
-    // ---------------------------------------------------------
-    // 3. LÓGICA DE BANDERAS (Checkout)
-    // ---------------------------------------------------------
-    var selectPais = document.querySelector('select[name="codigo_pais"]'); 
-    
-    if (selectPais) {
-        console.log("¡Selector de país encontrado! Aplicando banderas...");
+    var selectPais = document.querySelector('select[name="codigo_pais"]');
 
+    if (selectPais && !selectPais.parentNode.classList.contains('input-group')) {
         var mapaBanderas = {
             '+569': 'cl',
-            '+54':  'ar',
-            '+51':  'pe',
-            '+57':  'co'
+            '+54': 'ar',
+            '+51': 'pe',
+            '+57': 'co'
         };
 
-        // Crear la bandera visual
         var flagSpan = document.createElement('span');
-        flagSpan.className = 'input-group-text'; 
-        flagSpan.innerHTML = '<span class="fi fi-cl"></span>'; 
+        flagSpan.className = 'input-group-text';
+        flagSpan.innerHTML = '<span class="fi fi-cl"></span>';
 
-        // Crear el contenedor (wrapper)
         var parent = selectPais.parentNode;
         var wrapper = document.createElement('div');
         wrapper.className = 'input-group';
-        
-        // Mover los elementos
+
         parent.replaceChild(wrapper, selectPais);
         wrapper.appendChild(flagSpan);
         wrapper.appendChild(selectPais);
 
-        // Evento al cambiar
         selectPais.addEventListener('change', function() {
             var codigo = this.value;
             var paisIso = mapaBanderas[codigo] || 'xx';
             flagSpan.innerHTML = '<span class="fi fi-' + paisIso + '"></span>';
         });
 
-        // Inicializar
         selectPais.dispatchEvent(new Event('change'));
     }
 
-    // ---------------------------------------------------------
-    // 4. VALIDACIÓN DE TELÉFONO (8 Dígitos y Solo Números)
-    // ---------------------------------------------------------
     var inputTelefono = document.getElementById('input-telefono');
-    
+
     if (inputTelefono) {
-        // Crear el mensaje de error
         var mensajeLimite = document.createElement('small');
         mensajeLimite.style.color = 'red';
         mensajeLimite.style.display = 'none';
         mensajeLimite.innerText = '¡Límite de 8 números alcanzado!';
-        
-        // Insertar mensaje después del input (o del input-group si existiera)
+
         inputTelefono.parentNode.appendChild(mensajeLimite);
 
         inputTelefono.addEventListener('input', function() {
-            // Eliminar cualquier caracter que no sea número
             this.value = this.value.replace(/[^0-9]/g, '');
 
-            // Mostrar mensaje si llega a 8
             if (this.value.length >= 8) {
                 mensajeLimite.style.display = 'block';
             } else {
@@ -93,32 +70,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ---------------------------------------------------------
-    // 6. MOSTRAR/OCULTAR CONTRASEÑA
-    // ---------------------------------------------------------
     var passwordInputs = document.querySelectorAll('input[type="password"]');
 
     passwordInputs.forEach(function(input) {
-        // 1. Crear el contenedor 'input-group' de Bootstrap
         var wrapper = document.createElement('div');
         wrapper.className = 'input-group';
-        
-        // 2. Insertar el wrapper antes del input
+
         input.parentNode.insertBefore(wrapper, input);
-        
-        // 3. Mover el input dentro del wrapper
+
         wrapper.appendChild(input);
-        
-        // 4. Crear el botón del ojo
+
         var button = document.createElement('button');
         button.className = 'btn btn-outline-secondary';
         button.type = 'button';
-        // Ajustes visuales para bordes redondeados
-        button.style.borderTopRightRadius = "0.375rem"; 
+        button.style.borderTopRightRadius = "0.375rem";
         button.style.borderBottomRightRadius = "0.375rem";
         button.innerHTML = '<i class="bi bi-eye"></i>';
-        
-        // 5. Lógica del click
+
         button.addEventListener('click', function() {
             if (input.type === 'password') {
                 input.type = 'text';
@@ -128,25 +96,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 button.innerHTML = '<i class="bi bi-eye"></i>';
             }
         });
-        
-        // 6. Agregar botón al wrapper
+
         wrapper.appendChild(button);
     });
 
-    // ---------------------------------------------------------
-    // 7. FORMATO RUT CHILENO AUTOMÁTICO (NUEVO)
-    // ---------------------------------------------------------
-    // Detecta cualquier input con la clase 'rut-input' y le da formato
-    document.addEventListener('input', function (e) {
+    document.addEventListener('input', function(e) {
         if (e.target.classList.contains('rut-input')) {
-            // Eliminar caracteres no válidos
             let rut = e.target.value.replace(/[^0-9kK]/g, '').toUpperCase();
-            
+
             if (rut.length > 1) {
-                // Separar cuerpo y dígito verificador
                 const cuerpo = rut.slice(0, -1);
                 const dv = rut.slice(-1);
-                // Agregar puntos
                 e.target.value = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, ".") + "-" + dv;
             } else {
                 e.target.value = rut;
@@ -154,11 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-}); // Fin del DOMContentLoaded
-
-// ---------------------------------------------------------
-// 5. FUNCIONES GLOBALES DEL CARRITO (Fuera del DOMContentLoaded)
-// ---------------------------------------------------------
+});
 
 function validarYEnviar(input, idProducto, nombreProducto) {
     var cantidad = parseInt(input.value);
@@ -167,9 +123,9 @@ function validarYEnviar(input, idProducto, nombreProducto) {
     if (cantidad === 0) {
         var confirmar = confirm("¿Estás seguro que deseas eliminar '" + nombreProducto + "' del carrito?");
         if (confirmar) {
-            form.submit(); 
+            form.submit();
         } else {
-            input.value = 1; 
+            input.value = 1;
         }
     } else if (cantidad < 0) {
         alert("La cantidad no puede ser negativa.");
@@ -183,5 +139,66 @@ function confirmarEliminar(url, nombreProducto) {
     var confirmar = confirm("¿Estás seguro que deseas eliminar '" + nombreProducto + "'?");
     if (confirmar) {
         window.location.href = url;
+    }
+}
+
+async function validarDireccion(forzado = false) {
+    const direccionInput = document.getElementById("id_direccion");
+    const comunaInput = document.getElementById("id_comuna");
+    const postalInput = document.getElementById("id_codigo_postal");
+
+    const direccion = direccionInput.value.trim();
+    const comuna = comunaInput.value.trim();
+    const postal = postalInput.value.trim();
+
+    let query = "";
+
+    if (direccion) query += direccion;
+    if (comuna) query += (query ? ", " : "") + comuna;
+    if (postal) query += (query ? ", " : "") + postal;
+    query += ", Chile";
+
+    if (!query.replace(", Chile", "").trim()) {
+        if (forzado)
+            alert("Debes ingresar al menos Dirección, Comuna o Código Postal");
+        return;
+    }
+
+    const apiKey = "f01f935c76bd4bf4aa61ba170308c61b";
+    const url = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(query)}&apiKey=${apiKey}`;
+
+    try {
+        const resp = await fetch(url);
+        const data = await resp.json();
+
+        let alerta = document.getElementById("alerta");
+        if (!alerta) {
+            alerta = document.createElement("div");
+            alerta.id = "alerta";
+            alerta.className = "mt-2 small fw-bold";
+            direccionInput.parentNode.appendChild(alerta);
+        }
+
+        if (!data.features || !data.features.length) {
+            alerta.innerHTML = "❌ Dirección / comuna / código postal no válidos";
+            alerta.style.color = "red";
+            return false;
+        }
+
+        const info = data.features[0].properties;
+
+        alerta.innerHTML = `
+            ✔ Dirección encontrada: <br>
+            <span class="text-muted">${info.formatted}</span>
+        `;
+        alerta.style.color = "green";
+
+        if (info.city && !comunaInput.value) comunaInput.value = info.city;
+        if (info.postcode && !postalInput.value) postalInput.value = info.postcode;
+
+        return true;
+    } catch (error) {
+        console.error("Error validando dirección:", error);
+        return false;
     }
 }

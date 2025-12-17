@@ -1,94 +1,142 @@
 {% extends 'base.html' %}
 
-{% block title %}Atención al Cliente{% endblock %}
+{% block title %}Dashboard Atención - Vive Sano{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2 class="mb-4"><i class="bi bi-headset text-primary"></i> Atención al Cliente</h2>
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-success"><i class="bi bi-headset"></i> Atención al Cliente</h2>
+    </div>
 
-    <div class="row">
-        <div class="col-md-12">
-            {% for notif in notificaciones %}
-            <div class="card mb-3 border-start border-5 shadow-sm {% if 'TRANSFERENCIA' in notif.mensaje %}border-info{% elif notif.estado == 'PENDIENTE' %}border-danger{% else %}border-warning{% endif %}">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                <i class="bi bi-check-circle-fill me-2"></i> {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if notificaciones %}
+        {% for notif in notificaciones %}
+            <!-- Borde condicional: Naranja (Reserva), Azul (Transferencia), Rojo (Incidencia) -->
+            <div class="card shadow-sm mb-4 border-0 border-start border-4 
+                {% if 'Reserva' in notif.pedido.estado %}border-warning
+                {% elif 'TRANSFERENCIA' in notif.mensaje %}border-info
+                {% else %}border-danger{% endif %}">
+                
                 <div class="card-body">
-                    <div class="d-flex justify-content-between">
-                        <h5 class="card-title {% if 'TRANSFERENCIA' in notif.mensaje %}text-info{% else %}text-danger{% endif %}">
-                            {% if 'TRANSFERENCIA' in notif.mensaje %}
-                                <i class="bi bi-bank"></i> Confirmación de Pago
+                    <!-- ENCABEZADO -->
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title fw-bold 
+                            {% if 'Reserva' in notif.pedido.estado %}text-warning
+                            {% elif 'TRANSFERENCIA' in notif.mensaje %}text-info
+                            {% else %}text-danger{% endif %}">
+                            
+                            {% if 'Reserva' in notif.pedido.estado %}
+                                <i class="bi bi-calendar-check-fill me-2"></i>Solicitud de Reserva: Pedido #{{ notif.pedido.id }}
+                            {% elif 'TRANSFERENCIA' in notif.mensaje %}
+                                <i class="bi bi-wallet2 me-2"></i>Confirmar Transferencia: Pedido #{{ notif.pedido.id }}
                             {% else %}
-                                <i class="bi bi-exclamation-triangle-fill"></i> Incidencia: Pedido #{{ notif.pedido.id }}
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>Incidencia: Pedido #{{ notif.pedido.id }}
                             {% endif %}
                         </h5>
-                        <small class="text-muted">{{ notif.fecha|timesince }} atrás</small>
+                        <small class="text-muted"><i class="bi bi-clock"></i> {{ notif.fecha|timesince }} atrás</small>
                     </div>
-                    
-                    <p class="card-text fs-5">{{ notif.mensaje }}</p>
-                    
-                    <div class="bg-light p-3 rounded mb-3">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <small class="text-muted d-block">Cliente</small>
-                                <strong>{{ notif.pedido.cliente.nombre }} {{ notif.pedido.cliente.apellido }}</strong>
+
+                    <p class="card-text fs-5 mb-3">{{ notif.mensaje }}</p>
+
+                    <!-- INFO CLIENTE -->
+                    <div class="bg-light p-3 rounded mb-3 border">
+                        <div class="row align-items-center">
+                            <div class="col-md-3 border-end">
+                                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Cliente</small>
+                                <div class="fw-bold">{{ notif.pedido.cliente.nombre }} {{ notif.pedido.cliente.apellido }}</div>
                             </div>
-                            <div class="col-md-4">
-                                <small class="text-muted d-block">Teléfono</small>
-                                <span>{{ notif.pedido.cliente.telefono }}</span>
+                            <div class="col-md-3 border-end">
+                                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Teléfono</small>
+                                <div>{{ notif.pedido.cliente.telefono }}</div>
                             </div>
-                            <div class="col-md-4">
-                                <small class="text-muted d-block">Email</small>
-                                <a href="mailto:{{ notif.pedido.cliente.email }}">{{ notif.pedido.cliente.email }}</a>
+                            <div class="col-md-4 border-end">
+                                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Email</small>
+                                <div><a href="mailto:{{ notif.pedido.cliente.email }}" class="text-decoration-none">{{ notif.pedido.cliente.email }}</a></div>
+                            </div>
+                            <div class="col-md-2 text-end">
+                                <a href="{% url 'redactar_correo' notif.id %}" class="btn btn-primary btn-sm rounded-pill w-100">
+                                    <i class="bi bi-envelope-fill me-1"></i> Contactar
+                                </a>
                             </div>
                         </div>
                     </div>
 
-                    <div class="d-flex gap-2 align-items-center">
+                    <!-- FOOTER DE ACCIONES -->
+                    <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
                         
-                        {% if 'TRANSFERENCIA' in notif.mensaje %}
-                            <div class="p-2 mb-0 d-flex align-items-center me-auto bg-info-subtle border border-info rounded text-info-emphasis">
-                                <i class="bi bi-info-circle me-2"></i> Verifica si llegó el comprobante al correo.
-                            </div>
-                            
-                            <a href="{% url 'confirmar_transferencia' notif.id %}" class="btn btn-success text-white shadow-sm">
-                                <i class="bi bi-check-circle-fill me-1"></i> Confirmar Pago Recibido
-                            </a>
-                            
-                            <a href="{% url 'anular_pedido' notif.id %}" class="btn btn-outline-danger shadow-sm" onclick="return confirm('¿Seguro? El pedido se anulará permanentemente.');">
-                                <i class="bi bi-x-circle me-1"></i> No llegó (Anular)
-                            </a>
+                        <!-- ESTADO (IZQUIERDA) -->
+                        <div>
+                            {% if 'Reserva' in notif.pedido.estado %}
+                                <span class="badge bg-warning text-dark fs-6 px-3 py-2">
+                                    <i class="bi bi-truck me-1"></i> Gestión con Proveedor
+                                </span>
+                            {% elif 'TRANSFERENCIA' in notif.mensaje %}
+                                <span class="badge bg-info text-dark fs-6 px-3 py-2">
+                                    <i class="bi bi-hourglass-split me-1"></i> Esperando Comprobante
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger fs-6 px-3 py-2">
+                                    <i class="bi bi-tools me-1"></i> Requiere Solución
+                                </span>
+                            {% endif %}
+                        </div>
 
-                        {% elif notif.estado == 'PENDIENTE' %}
-                            <a href="{% url 'redactar_correo' notif.id %}" class="btn btn-primary shadow-sm">
-                                <i class="bi bi-envelope-fill me-1"></i> Contactar Cliente
-                            </a>
-                        
-                        {% elif notif.estado == 'ESPERA' %}
-                            <button class="btn btn-secondary" disabled>
-                                <i class="bi bi-clock me-1"></i> Esperando respuesta...
-                            </button>
+                        <!-- BOTONES (DERECHA) -->
+                        <div class="d-flex gap-2 align-items-center">
                             
-                            <div class="ms-auto d-flex gap-2 align-items-center">
-                                <span class="text-muted small me-2">¿El cliente respondió?</span>
-                                
-                                <a href="{% url 'marcar_gestionado' notif.id %}" class="btn btn-outline-success btn-sm">
-                                    <i class="bi bi-check-lg"></i> Resuelto (Devolver a Logística)
+                            <!-- CASO 1: RESERVA -->
+                            {% if 'Reserva' in notif.pedido.estado %}
+                                <a href="{% url 'marcar_gestionado' notif.id %}" class="btn btn-outline-success">
+                                    <i class="bi bi-box-seam-fill me-1"></i> ¡Llegó el Producto!
                                 </a>
-                                
-                                <a href="{% url 'anular_pedido' notif.id %}" class="btn btn-outline-danger btn-sm" onclick="return confirm('¿Seguro? Esto devolverá el stock y anulará el pedido.');">
-                                    <i class="bi bi-x-circle"></i> Reembolsar y Anular
+                                <a href="{% url 'anular_pedido' notif.id %}" class="btn btn-outline-danger" 
+                                   onclick="return confirm('¿Cancelar reserva por falta de stock?')">
+                                    <i class="bi bi-x-circle me-1"></i> Cancelar Reserva
                                 </a>
-                            </div>
-                        {% endif %}
+
+                            <!-- CASO 2: TRANSFERENCIA -->
+                            {% elif 'TRANSFERENCIA' in notif.mensaje %}
+                                <a href="{% url 'confirmar_transferencia' notif.id %}" class="btn btn-success"
+                                   onclick="return confirm('¿Confirmas que el dinero está en la cuenta bancaria?')">
+                                    <i class="bi bi-cash-coin me-1"></i> Confirmar Pago
+                                </a>
+                                <a href="{% url 'anular_pedido' notif.id %}" class="btn btn-outline-danger" 
+                                   onclick="return confirm('¿Anular pedido por no pago?')">
+                                    <i class="bi bi-x-circle me-1"></i> Anular (No Pagó)
+                                </a>
+
+                            <!-- CASO 3: INCIDENCIA NORMAL (YA PAGADO) -->
+                            {% else %}
+                                <span class="text-muted me-2 small">¿Cliente respondió?</span>
+                                <a href="{% url 'registrar_respuesta' notif.id %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil-square"></i> Nota</a>
+                                <a href="{% url 'marcar_gestionado' notif.id %}" class="btn btn-outline-success">
+                                    <i class="bi bi-check-lg me-1"></i> Resuelto
+                                </a>
+                                <a href="{% url 'anular_pedido' notif.id %}" class="btn btn-outline-danger" 
+                                   onclick="return confirm('¿Reembolsar y anular?')">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reembolsar
+                                </a>
+                            {% endif %}
+                        </div>
                     </div>
+
                 </div>
             </div>
-            {% empty %}
-            <div class="text-center py-5">
-                <i class="bi bi-emoji-smile fs-1 text-muted"></i>
-                <h4 class="mt-3 text-muted">¡Excelente!</h4>
-                <p class="text-muted">No hay incidencias ni pagos pendientes de revisión.</p>
-            </div>
-            {% endfor %}
+        {% endfor %}
+    {% else %}
+        <div class="text-center py-5 mt-5">
+            <div class="mb-3"><i class="bi bi-emoji-smile display-1 text-success opacity-50"></i></div>
+            <h3 class="text-muted fw-bold">¡Excelente Trabajo!</h3>
+            <p class="text-muted lead">No hay tareas pendientes.</p>
         </div>
-    </div>
+    {% endif %}
 </div>
 {% endblock %}

@@ -4,32 +4,21 @@ from django.contrib.auth.models import User
 from gestion.models import Cliente
 from itertools import cycle
 
-# -------------------------------------------------------
-# LÓGICA DE VALIDACIÓN RUT (Módulo 11)
-# -------------------------------------------------------
 def validar_rut_chileno(rut):
-    # 1. Limpiamos puntos y guiones y pasamos a mayúsculas
     rut_limpio = rut.replace('.', '').replace('-', '').upper()
-    
-    # Validaciones básicas de largo
     if not rut_limpio or len(rut_limpio) < 8:
         return False
         
     cuerpo = rut_limpio[:-1]
     dv_ingresado = rut_limpio[-1]
     
-    # El cuerpo debe ser numérico
     if not cuerpo.isdigit():
         return False
-        
-    # Algoritmo matemático Módulo 11
     try:
-        # Invertimos el cuerpo para multiplicar de derecha a izquierda
         reverso = map(int, reversed(str(cuerpo)))
-        factors = cycle(range(2, 8)) # Secuencia 2, 3, 4, 5, 6, 7, 2, 3...
+        factors = cycle(range(2, 8))
         s = sum(d * f for d, f in zip(reverso, factors))
         res = (-s) % 11
-        
         if res == 10:
             dv_esperado = 'K'
         elif res == 11:
@@ -41,21 +30,17 @@ def validar_rut_chileno(rut):
     except ValueError:
         return False
 
-# -------------------------------------------------------
-# FORMULARIO 1: Checkout Completo
-# -------------------------------------------------------
 class DatosEnvioForm(forms.ModelForm):
     first_name = forms.CharField(label="Nombre", widget=forms.TextInput(attrs={'class': 'form-control'}))
     last_name = forms.CharField(label="Apellido", widget=forms.TextInput(attrs={'class': 'form-control'}))
     
-    # --- CAMPO RUT CON LÍMITE DE 12 CARACTERES ---
     rut = forms.CharField(
         label='RUT', 
         required=True, 
         widget=forms.TextInput(attrs={
             'placeholder': '12.345.678-9',
             'class': 'form-control rut-input', 
-            'maxlength': '12' # <--- ESTO EVITA QUE ESCRIBAN MÁS DE LA CUENTA
+            'maxlength': '12' 
         }),
         help_text="Sin puntos ni guión (se formateará automático)."
     )
@@ -135,9 +120,7 @@ class DatosEnvioForm(forms.ModelForm):
             raise forms.ValidationError("El RUT ingresado no es válido (Revisa el dígito verificador).")
         return rut
 
-# -------------------------------------------------------
-# FORMULARIO 2: Registro Rápido
-# -------------------------------------------------------
+
 class RegistroClienteForm(UserCreationForm):
     email = forms.EmailField(label="Correo Electrónico", widget=forms.EmailInput(attrs={'placeholder': 'ejemplo@correo.cl'}))
 
@@ -155,9 +138,7 @@ class RegistroClienteForm(UserCreationForm):
             Cliente.objects.create(user=user, email=user.email)
         return user
 
-# -------------------------------------------------------
-# FORMULARIO 3: Soporte / Atención al Cliente
-# -------------------------------------------------------
+
 class CorreoSoporteForm(forms.Form):
     asunto = forms.CharField(
         label="Asunto", 
@@ -169,7 +150,7 @@ class CorreoSoporteForm(forms.Form):
     )
 
 # -------------------------------------------------------
-# FORMULARIO 4: Mi Perfil (ACTUALIZADO)
+# FORMULARIO 4: Mi Perfil
 # -------------------------------------------------------
 class PerfilUsuarioForm(forms.ModelForm):
     first_name = forms.CharField(label="Nombre", widget=forms.TextInput(attrs={'class': 'form-control'}))
@@ -183,7 +164,7 @@ class PerfilUsuarioForm(forms.ModelForm):
         widget=forms.TextInput(attrs={
             'class': 'form-control rut-input', 
             'placeholder': '12.345.678-9',
-            'maxlength': '12' # <--- LÍMITE APLICADO
+            'maxlength': '12'
         })
     )
     
@@ -249,15 +230,12 @@ class PerfilUsuarioForm(forms.ModelForm):
         self.fields['telefono'].required = True
         self.fields['codigo_postal'].required = True
 
-    # VALIDACIÓN DEL RUT EN PERFIL
     def clean_rut(self):
         rut = self.cleaned_data.get('rut')
         
-        # Validamos formato matemático
         if not validar_rut_chileno(rut):
             raise forms.ValidationError("RUT inválido.")
             
-        # Validamos que no pertenezca a OTRO usuario (unicidad)
         existe_otro = Cliente.objects.filter(rut=rut).exclude(user=self.user).exists()
         if existe_otro:
             raise forms.ValidationError("Este RUT ya está registrado en otra cuenta.")

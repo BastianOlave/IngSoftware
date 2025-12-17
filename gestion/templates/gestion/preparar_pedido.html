@@ -1,108 +1,145 @@
 {% extends 'base.html' %}
+{% load filtros_extra %}
 
 {% block title %}Preparar Pedido #{{ pedido.id }}{% endblock %}
 
 {% block content %}
-<div class="container">
-    <a href="{% url 'dashboard_logistica' %}" class="btn btn-outline-secondary mb-3">
+<div class="container mt-4">
+    <a href="{% url 'dashboard_logistica' %}" class="btn btn-outline-secondary mb-4">
         <i class="bi bi-arrow-left"></i> Volver al listado
     </a>
 
     <div class="row">
         <div class="col-md-8">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Contenido del Pedido #{{ pedido.id }}</h5>
+            
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0 fw-bold">Contenido del Pedido #{{ pedido.id }}</h5>
                 </div>
                 <div class="card-body">
-                    <div class="bg-info-subtle border border-info rounded p-3 mb-4 d-flex align-items-center">
-                        <i class="bi bi-info-circle-fill me-2 fs-4 text-info-emphasis"></i>
-                        <div class="text-info-emphasis">
-                            <strong>Instrucción:</strong> Revisa que haya stock físico de cada producto antes de confirmar.
+                    
+                    {% if pedido.es_reserva %}
+                        <div class="alert alert-warning d-flex align-items-center">
+                            <i class="bi bi-star-fill fs-4 me-3"></i>
+                            <div>
+                                <strong>¡Atención! Este es un pedido de RESERVA.</strong><br>
+                                El producto fue solicitado especialmente. Verifique que el producto reservado esté físicamente separado.
+                            </div>
                         </div>
-                    </div>
+                    {% else %}
+                        <div class="alert alert-info d-flex align-items-center">
+                            <i class="bi bi-info-circle-fill fs-4 me-3"></i>
+                            <div>
+                                <strong>Instrucción:</strong> Revisa que haya stock físico de cada producto antes de confirmar.
+                            </div>
+                        </div>
+                    {% endif %}
 
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Producto</th>
-                                <th class="text-center">Cantidad Solicitada</th>
-                                <th class="text-center">Stock en Sistema</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for detalle in pedido.detalles.all %}
-                            <tr>
-                                <td>
-                                    <strong>{{ detalle.producto.nombre }}</strong>
-                                    <br>
-                                    <small class="text-muted">{{ detalle.producto.categoria }}</small>
-                                </td>
-                                <td class="text-center fs-5 fw-bold">{{ detalle.cantidad }}</td>
-                                <td class="text-center">
-                                    {% if detalle.producto.stock >= detalle.cantidad %}
-                                        <span class="badge bg-success">{{ detalle.producto.stock }} unid.</span>
-                                    {% else %}
-                                        <span class="badge bg-danger">{{ detalle.producto.stock }} unid. (Falta Stock)</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                    <!-- TABLA DE PRODUCTOS -->
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th class="text-center">Solicitado</th>
+                                    <th class="text-center">Estado Stock</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for detalle in pedido.detalles.all %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold">{{ detalle.producto.nombre }}</div>
+                                        <small class="text-muted">{{ detalle.producto.categoria }}</small>
+                                    </td>
+                                    <td class="text-center fs-5 fw-bold">{{ detalle.cantidad }}</td>
+                                    <td class="text-center">
+                                        {% if pedido.es_reserva %}
+                                            <!-- CASO RESERVA: Siempre OK -->
+                                            <span class="badge bg-warning text-dark border border-dark">
+                                                <i class="bi bi-check-circle-fill me-1"></i> Producto Reservado
+                                            </span>
+                                        {% else %}
+                                            <!-- CASO NORMAL: Validamos stock real -->
+                                            {% if detalle.producto.stock >= detalle.cantidad %}
+                                                <span class="badge bg-success">
+                                                    {{ detalle.producto.stock }} unid. (OK)
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-danger">
+                                                    {{ detalle.producto.stock }} unid. (Falta Stock)
+                                                </span>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-body">
-                    <h6>Datos de Despacho</h6>
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-secondary text-white">
-                            <h6 class="mb-0"><i class="bi bi-person-lines-fill"></i> Datos del Cliente</h6>
-                        </div>
-                        <div class="card-body">
-                            <p class="mb-1"><strong>Cliente:</strong> {{ pedido.cliente.nombre }} {{ pedido.cliente.apellido }}</p>
-                            <p class="mb-1"><strong>Teléfono:</strong> {{ pedido.cliente.telefono }}</p>
-                            <p class="mb-1"><strong>Dirección:</strong> {{ pedido.cliente.direccion }}</p>
-                            <p class="mb-1"><strong>Comuna:</strong> {{ pedido.cliente.comuna }}</p>
-                            <hr>
-                            <p class="mb-0">
-                            <strong>Estado Pago:</strong> 
-                            {% if 'WebPay' in pedido.estado %}
-                                <span class="badge bg-success">Pagado con WebPay</span>
-                            {% else %}
-                                <span class="badge bg-warning text-dark">{{ pedido.estado }}</span>
-                            {% endif %}
-                            </p>
-                        </div>
-                    </div>
+            <!-- DATOS DE DESPACHO -->
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0">Datos de Despacho</h6>
                 </div>
-            </div>
-        </div>
-
-        <div class="col-md-4">
-            <div class="card border-primary mb-3">
-                <div class="card-body text-center">
-                    <h5 class="card-title text-primary">Acciones de Logística</h5>
-                    <p class="card-text text-muted small">Selecciona una acción para finalizar la preparación.</p>
+                <div class="card-body">
+                    <div class="p-2 mb-3 bg-light border rounded">
+                        <i class="bi bi-person-fill"></i> <strong>Datos del Cliente</strong>
+                    </div>
+                    <p class="mb-1"><strong>Cliente:</strong> {{ pedido.cliente.nombre }} {{ pedido.cliente.apellido }}</p>
+                    <p class="mb-1"><strong>Teléfono:</strong> {{ pedido.cliente.telefono }}</p>
+                    <p class="mb-1"><strong>Dirección:</strong> {{ pedido.cliente.direccion }}, {{ pedido.cliente.comuna }}</p>
                     
                     <hr>
-
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'confirmar_pedido' pedido.id %}" class="btn btn-success btn-lg mb-2">
-                            <i class="bi bi-box-seam-fill"></i> Pedido Completo
-                        </a>
-                        <small class="text-muted text-center mb-3">
-                            Descuenta el stock automáticamente y marca como despachado.
-                        </small>
-
-                        <a href="{% url 'reportar_faltante' pedido.id %}" class="btn btn-outline-danger">
-                            <i class="bi bi-bell-fill"></i> Notificar Faltante
-                        </a>
-                        <small class="text-muted text-center">
-                            Envía alerta a Atención al Cliente y pausa el pedido.
-                        </small>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><strong>Estado Pago:</strong> 
+                            <span class="badge {% if 'Pagado' in pedido.estado %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                {{ pedido.estado }}
+                            </span>
+                        </span>
+                        
+                        <span><strong>Tipo Entrega:</strong> 
+                            <span class="badge bg-primary">
+                                {{ pedido.get_tipo_entrega_display }}
+                            </span>
+                        </span>
                     </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- COLUMNA DERECHA: ACCIONES -->
+        <div class="col-md-4">
+            <div class="card shadow border-0 sticky-top" style="top: 20px; z-index: 1;">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-primary fw-bold mb-3">Acciones de Logística</h5>
+                    <p class="text-muted small">Selecciona una acción para finalizar la preparación.</p>
+                    
+                    <!-- BOTÓN DE CONFIRMAR -->
+                    <!-- Si es reserva, el botón es "Confirmar Reserva Lista"-->
+                    {% if pedido.es_reserva %}
+                        <a href="{% url 'confirmar_pedido_listo' pedido.id %}" class="btn btn-warning w-100 py-2 mb-2 fw-bold border border-dark">
+                            <i class="bi bi-box-seam-fill me-2"></i> Confirmar Reserva Lista
+                        </a>
+                        <small class="text-muted d-block mb-4">Marca que el producto reservado ya está separado para entrega.</small>
+                    {% else %}
+                        <a href="{% url 'confirmar_pedido_listo' pedido.id %}" class="btn btn-success w-100 py-2 mb-2">
+                            <i class="bi bi-box-seam me-2"></i> Pedido Completo
+                        </a>
+                        <small class="text-muted d-block mb-4">Descuenta el stock automáticamente y marca como despachado.</small>
+                    {% endif %}
+
+                    <hr>
+
+                    <a href="{% url 'reportar_faltante' pedido.id %}" class="btn btn-outline-danger w-100" 
+                       onclick="return confirm('¿Seguro que falta stock? Esto enviará una alerta a Atención al Cliente.')">
+                        <i class="bi bi-bell-fill me-2"></i> Notificar Faltante
+                    </a>
+                    <small class="text-muted d-block mt-2">Envía alerta a Atención al Cliente y pausa el pedido.</small>
                 </div>
             </div>
         </div>

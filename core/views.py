@@ -7,7 +7,6 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.utils import timezone
 import time
-
 # Transbank
 from transbank.webpay.webpay_plus.transaction import Transaction
 from transbank.common.options import WebpayOptions
@@ -24,7 +23,7 @@ from .forms import DatosEnvioForm, RegistroClienteForm, PerfilUsuarioForm
 # ---------------------------------------------------------
 
 def home(request):
-    productos_destacados = Producto.objects.all().order_by('-id')[:4]
+    productos_destacados = Producto.objects.filter(stock__gt=0).order_by('-id')[:4]
     return render(request, 'core/home.html', {'productos': productos_destacados})
 
 def catalogo(request):
@@ -51,52 +50,35 @@ def agregar_producto(request, producto_id):
     carrito = Carrito(request)
     producto = get_object_or_404(Producto, id=producto_id)
 
-    cantidad_solicitada = int(request.POST.get('cantidad', 1))
+    cantidad = int(request.POST.get('cantidad', 1))
     
-    # --- LÓGICA DE VALIDACIÓN DE STOCK CORREGIDA ---
-    # 1. Obtenemos cuánto tiene ya este usuario en su carrito
-    producto_id_str = str(producto.id)
-    cantidad_en_carrito = 0
+    # 1. Verificar cuánto tiene ya en el carrito
+    id_str = str(producto.id)
+    cantidad_en_carrito = carrito.carrito[id_str]['cantidad'] if id_str in carrito.carrito else 0
     
-    if producto_id_str in carrito.carrito:
-        cantidad_en_carrito = carrito.carrito[producto_id_str]['cantidad']
-    
-    # 2. Sumamos lo que tiene + lo que quiere agregar
-    total_final = cantidad_en_carrito + cantidad_solicitada
-
-    # 3. Validamos contra el stock real
-    if total_final > producto.stock:
-        messages.error(request, f"No hay suficiente stock. Ya tienes {cantidad_en_carrito} en el carrito y solo quedan {producto.stock} disponibles en total.")
-        # Devolvemos al usuario a donde estaba
+    # 2. Validar suma total
+    if (cantidad_en_carrito + cantidad) > producto.stock:
+        messages.error(request, f"No hay suficiente stock. Tienes {cantidad_en_carrito} en el carro y quedan {producto.stock}.")
         return redirect(request.META.get('HTTP_REFERER', 'core:detalle'))
     
-    # Si pasa la validación, agregamos
-    carrito.agregar(producto=producto, cantidad=cantidad_solicitada)
-    
+    carrito.agregar(producto=producto, cantidad=cantidad)
     messages.success(request, f"¡{producto.nombre} agregado al carrito!")
 
     url_anterior = request.META.get('HTTP_REFERER')
-    
-    if url_anterior:
-        return redirect(url_anterior)
-    
-    return redirect('core:catalogo')
+    return redirect(url_anterior) if url_anterior else redirect('core:catalogo')
 
 def actualizar_carrito(request, producto_id):
     carrito = Carrito(request)
     producto = get_object_or_404(Producto, id=producto_id)
-    
-    try:
-        cantidad = int(request.POST.get('cantidad', 1))
-    except ValueError:
-        cantidad = 1
+    try: cantidad = int(request.POST.get('cantidad', 1))
+    except ValueError: cantidad = 1
 
     if cantidad == 0:
         carrito.eliminar(producto)
         return redirect('core:ver_carrito')
 
     if cantidad > producto.stock:
-        messages.error(request, f"¡Ups! Solo quedan {producto.stock} unidades de {producto.nombre}.")
+        messages.error(request, f"¡Ups! Solo quedan {producto.stock} unidades.")
         return redirect('core:ver_carrito')
 
     carrito.actualizar(producto, cantidad)
@@ -121,44 +103,32 @@ def ver_carrito(request):
     })
 
 # ---------------------------------------------------------
-# VISTAS DE USUARIO (AUTH + PERFIL)
+# VISTAS DE USUARIO
 # ---------------------------------------------------------
 
 def registro(request):
-    if request.user.is_authenticated:
-        return redirect('core:home')
-
+    if request.user.is_authenticated: return redirect('core:home')
     if request.method == 'POST':
         form = RegistroClienteForm(request.POST)
         if form.is_valid():
             usuario = form.save()
             login(request, usuario)
             return redirect('core:home')
-    else:
-        form = RegistroClienteForm()
+    else: form = RegistroClienteForm()
     return render(request, 'core/registro.html', {'form': form})
 
 def login_usuario(request):
-    if request.user.is_authenticated:
-        return redirect('core:home')
-
+    if request.user.is_authenticated: return redirect('core:home')
     if request.method == 'POST':
         data = request.POST.copy()
-        username = data.get('username')
-        try:
-            user_candidate = User.objects.get(username__iexact=username)
-            data['username'] = user_candidate.username
-        except User.DoesNotExist:
-            pass 
-
+        try: data['username'] = User.objects.get(username__iexact=data.get('username')).username
+        except User.DoesNotExist: pass 
         form = AuthenticationForm(request, data=data)
         if form.is_valid():
             login(request, form.get_user())
             return redirect('core:home')
-        else:
-            messages.error(request, "Usuario o contraseña incorrectos.")
-    else:
-        form = AuthenticationForm()
+        else: messages.error(request, "Usuario o contraseña incorrectos.")
+    else: form = AuthenticationForm()
     return render(request, 'core/login.html', {'form': form})
 
 def logout_usuario(request):
@@ -177,23 +147,16 @@ def perfil_usuario(request):
             request.user.save()
 
             cliente = form.save(commit=False)
-            cliente.nombre = form.cleaned_data['first_name']
-            cliente.apellido = form.cleaned_data['last_name']
-            cliente.email = form.cleaned_data['email']
-            
             cliente.rut = form.cleaned_data['rut']
             
-            codigo = form.cleaned_data['codigo_pais']
-            numero = form.cleaned_data['telefono']
-            cliente.telefono = f"{codigo}{numero}"
+            num = form.cleaned_data['telefono']
+            cod = form.cleaned_data['codigo_pais']
+            cliente.telefono = f"{cod}{num}" if not num.startswith('+') else num
             
-            cliente.codigo_postal = form.cleaned_data['codigo_postal']
             cliente.save()
-            
-            messages.success(request, "Tus datos han sido actualizados correctamente.")
+            messages.success(request, "Datos actualizados.")
             return redirect('core:perfil')
-    else:
-        form = PerfilUsuarioForm(instance=cliente, user=request.user)
+    else: form = PerfilUsuarioForm(instance=cliente, user=request.user)
     return render(request, 'core/perfil.html', {'form': form})
 
 @login_required
@@ -201,8 +164,7 @@ def mis_pedidos(request):
     try:
         cliente = Cliente.objects.get(user=request.user)
         pedidos = Pedido.objects.filter(cliente=cliente).order_by('-fecha')
-    except Cliente.DoesNotExist:
-        pedidos = []
+    except Cliente.DoesNotExist: pedidos = []
     return render(request, 'core/mis_pedidos.html', {'pedidos': pedidos})
 
 @login_required
@@ -210,54 +172,67 @@ def detalle_pedido_cliente(request, pedido_id):
     try:
         cliente = Cliente.objects.get(user=request.user)
         pedido = get_object_or_404(Pedido, id=pedido_id, cliente=cliente)
-    except Cliente.DoesNotExist:
-        return redirect('core:home')
+    except Cliente.DoesNotExist: return redirect('core:home')
 
-    estado_actual = pedido.estado
-    
-    # Lógica de barra de progreso estándar
+    estado = pedido.estado
     progreso = {
-        'recibido': True,
-        'pagado': False,
-        'preparacion': False,
-        'despachado': False
+        'recibido': True, 
+        'pagado': 'Pagado' in estado or 'Preparacion' in estado or 'Despachado' in estado,
+        'preparacion': 'Preparacion' in estado or 'Despachado' in estado,
+        'despachado': 'Despachado' in estado
     }
-    if 'Pagado' in estado_actual or 'Preparacion' in estado_actual or 'Despachado' in estado_actual:
-        progreso['pagado'] = True
-    if 'Preparacion' in estado_actual or 'Despachado' in estado_actual:
-        progreso['preparacion'] = True
-    if 'Despachado' in estado_actual:
-        progreso['despachado'] = True
-
-    # Detectar si es una reserva habilitada para pagar
-    es_reserva_pagable = (estado_actual == 'Reserva Disponible')
-
-    return render(request, 'core/detalle_pedido_cliente.html', {
-        'pedido': pedido,
-        'progreso': progreso,
-        'es_reserva_pagable': es_reserva_pagable # Variable nueva para el template
-    })
+    return render(request, 'core/detalle_pedido_cliente.html', {'pedido': pedido, 'progreso': progreso})
 
 # ---------------------------------------------------------
-# PROCESO DE PAGO
+# RESERVAS
+# ---------------------------------------------------------
+
+@login_required
+def reservar_producto(request, producto_id):
+    producto = get_object_or_404(Producto, id=producto_id)
+    try: cliente = Cliente.objects.get(user=request.user)
+    except Cliente.DoesNotExist: 
+        messages.error(request, "Completa tu perfil antes de reservar.")
+        return redirect('core:perfil')
+
+    # Marcamos es_reserva=True para la memoria del pedido
+    pedido = Pedido.objects.create(
+        cliente=cliente, 
+        total=producto.precio, 
+        estado='Reserva Pendiente', 
+        tipo_entrega='Despacho',
+        es_reserva=True 
+    )
+    DetallePedido.objects.create(pedido=pedido, producto=producto, cantidad=1, precio_unitario=producto.precio)
+
+    try:
+        grupo = Group.objects.get(name='Atencion al cliente')
+        Notificacion.objects.create(
+            destinatario_grupo=grupo, 
+            pedido=pedido, 
+            mensaje=f"SOLICITUD RESERVA: {cliente.nombre} solicita {producto.nombre}.", 
+            estado='PENDIENTE'
+        )
+    except Group.DoesNotExist: pass
+
+    messages.success(request, f"Reserva solicitada para {producto.nombre}. Te avisaremos cuando llegue.")
+    return redirect('core:mis_pedidos')
+
+# ---------------------------------------------------------
+# PROCESO DE PAGO Y CHECKOUT
 # ---------------------------------------------------------
 
 @login_required
 def checkout(request):
     carrito = Carrito(request)
-    if len(carrito) == 0:
-        return redirect('core:home')
+    if len(carrito) == 0: return redirect('core:home')
 
-    try:
-        cliente = Cliente.objects.get(user=request.user)
-    except Cliente.DoesNotExist:
-        if request.user.email:
-            cliente, created = Cliente.objects.get_or_create(email=request.user.email, defaults={'user': request.user})
-            if not created:
-                cliente.user = request.user
-                cliente.save()
-        else:
-            cliente = Cliente.objects.create(user=request.user, email="")
+    try: cliente = Cliente.objects.get(user=request.user)
+    except Cliente.DoesNotExist: 
+        if request.user.email: 
+            cliente, _ = Cliente.objects.get_or_create(email=request.user.email, defaults={'user':request.user})
+            if not _: cliente.user = request.user; cliente.save()
+        else: cliente = Cliente.objects.create(user=request.user, email="")
 
     if request.method == 'POST':
         form = DatosEnvioForm(request.POST, instance=cliente, user=request.user)
@@ -267,82 +242,94 @@ def checkout(request):
             request.user.save()
 
             cliente = form.save(commit=False)
-            cliente.nombre = form.cleaned_data['first_name']
-            cliente.apellido = form.cleaned_data['last_name']
             cliente.rut = form.cleaned_data['rut']
             
-            codigo = form.cleaned_data['codigo_pais']
-            numero = form.cleaned_data['telefono']
-            cliente.telefono = f"{codigo}{numero}"
-            cliente.codigo_postal = form.cleaned_data['codigo_postal']
+            num = form.cleaned_data['telefono']
+            cod = form.cleaned_data['codigo_pais']
+            cliente.telefono = f"{cod}{num}"
+            
             cliente.save()
 
-            # Validar Stock (Ultima verificacion antes de avanzar)
             for item in carrito.obtener_items():
-                producto_bd = Producto.objects.get(id=item['producto_id'])
-                if producto_bd.stock < item['cantidad']:
-                    messages.error(request, f"Sin stock suficiente de {producto_bd.nombre}.")
+                p = Producto.objects.get(id=item['producto_id'])
+                if p.stock < item['cantidad']:
+                    messages.error(request, f"Sin stock de {p.nombre}.")
                     return redirect('core:ver_carrito')
 
-            # RECICLAJE DE PEDIDO (No saltar IDs)
             pedido = Pedido.objects.filter(cliente=cliente, estado='Pendiente').first()
-
             if pedido:
                 pedido.fecha = timezone.now()
                 pedido.total = carrito.obtener_total_precio()
                 pedido.save()
                 pedido.detalles.all().delete()
             else:
-                pedido = Pedido.objects.create(
-                    cliente=cliente,
-                    total=carrito.obtener_total_precio(),
-                    estado='Pendiente'
-                )
+                pedido = Pedido.objects.create(cliente=cliente, total=carrito.obtener_total_precio(), estado='Pendiente')
 
             for item in carrito.obtener_items():
-                producto = get_object_or_404(Producto, id=item['producto_id'])
-                DetallePedido.objects.create(
-                    pedido=pedido,
-                    producto=producto,
-                    cantidad=item['cantidad'],
-                    precio_unitario=item['precio']
-                )
+                p = get_object_or_404(Producto, id=item['producto_id'])
+                DetallePedido.objects.create(pedido=pedido, producto=p, cantidad=item['cantidad'], precio_unitario=item['precio'])
             
             return redirect('core:seleccion_envio', pedido_id=pedido.id)
-            
     else:
         form = DatosEnvioForm(instance=cliente, user=request.user)
 
-    return render(request, 'core/confirmar_compra.html', {
-        'form': form,
-        'carrito': carrito,
-        'total': carrito.obtener_total_precio()
-    })
+    return render(request, 'core/confirmar_compra.html', {'form': form, 'total': carrito.obtener_total_precio()})
+
+# --- CHECKOUT PARA RESERVAS ---
+@login_required
+def checkout_reserva(request, pedido_id):
+    pedido = get_object_or_404(Pedido, id=pedido_id, cliente__user=request.user)
+    
+    if pedido.estado != 'Reserva Disponible':
+        return redirect('core:mis_pedidos')
+
+    if request.method == 'POST':
+        form = DatosEnvioForm(request.POST, instance=pedido.cliente, user=request.user)
+        if form.is_valid():
+            request.user.first_name = form.cleaned_data['first_name']
+            request.user.last_name = form.cleaned_data['last_name']
+            request.user.save()
+
+            cliente = form.save(commit=False)
+            cliente.rut = form.cleaned_data['rut']
+            num = form.cleaned_data['telefono']
+            cod = form.cleaned_data['codigo_pais']
+            cliente.telefono = f"{cod}{num}"
+            cliente.save()
+            return redirect('core:seleccion_envio', pedido_id=pedido.id)
+    else:
+        form = DatosEnvioForm(instance=pedido.cliente, user=request.user)
+
+    return render(request, 'core/confirmar_compra.html', {'form': form, 'total': pedido.total})
 
 @login_required
 def seleccion_envio(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id, cliente__user=request.user)
     
-    subtotal_productos = pedido.total
-    COSTO_ENVIO_FIJO = 5990
+    # 1. Calculamos subtotal real sumando los items
+    subtotal_productos = sum(d.precio_unitario * d.cantidad for d in pedido.detalles.all())
+    COSTO_ENVIO_FIJO = 5990 
     UMBRAL_GRATIS = 25000
     aplica_gratis = subtotal_productos > UMBRAL_GRATIS
 
     if request.method == 'POST':
-        tipo_seleccionado = request.POST.get('opcion_envio') 
+        tipo = request.POST.get('opcion_envio') 
 
-        if tipo_seleccionado == 'despacho':
+        if tipo == 'despacho':
             pedido.tipo_entrega = 'Despacho'
             if not aplica_gratis:
                 pedido.total = subtotal_productos + COSTO_ENVIO_FIJO
-            
-        elif tipo_seleccionado == 'retiro':
+            else:
+                pedido.total = subtotal_productos
+        
+        elif tipo == 'retiro':
             pedido.tipo_entrega = 'Retiro'
             pedido.total = subtotal_productos
 
         pedido.save()
         return redirect('core:seleccion_pago', pedido_id=pedido.id)
 
+    # Pasamos las variables con el nombre correcto al template
     context = {
         'pedido': pedido,
         'subtotal': subtotal_productos,
@@ -359,114 +346,47 @@ def iniciar_pago_transferencia(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     pedido.estado = 'Pendiente Pago (Transferencia)'
     pedido.save()
-    
     try:
-        grupo_atencion = Group.objects.get(name='Atencion al cliente')
-        existe = Notificacion.objects.filter(pedido=pedido, mensaje__contains="TRANSFERENCIA").exists()
-        if not existe:
-            Notificacion.objects.create(
-                destinatario_grupo=grupo_atencion,
-                pedido=pedido,
-                mensaje=f"TRANSFERENCIA: El cliente {pedido.cliente.nombre} seleccionó transferencia. Esperando comprobante.",
-                estado='PENDIENTE'
-            )
-    except Group.DoesNotExist:
-        pass
+        grupo = Group.objects.get(name='Atencion al cliente')
+        if not Notificacion.objects.filter(pedido=pedido, mensaje__contains="TRANSFERENCIA").exists():
+            Notificacion.objects.create(destinatario_grupo=grupo, pedido=pedido, mensaje=f"TRANSFERENCIA: {pedido.cliente.nombre} seleccionó transf.", estado='PENDIENTE')
+    except: pass
     
-    carrito = Carrito(request)
-    carrito.limpiar()
-    
+    Carrito(request).limpiar()
     return render(request, 'core/transferencia_instrucciones.html', {'pedido': pedido})
 
 def iniciar_pago_webpay(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
-    tx = Transaction(WebpayOptions(
-        IntegrationCommerceCodes.WEBPAY_PLUS, 
-        IntegrationApiKeys.WEBPAY, 
-        IntegrationType.TEST
-    ))
+    tx = Transaction(WebpayOptions(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, IntegrationType.TEST))
     buy_order = f"P-{pedido.id}-{int(time.time())}"
     session_id = f"S-{request.user.id}-{int(time.time())}"
-    amount = int(pedido.total)
     return_url = request.build_absolute_uri('/webpay/retorno/') 
-    response = tx.create(buy_order, session_id, amount, return_url)
+    response = tx.create(buy_order, session_id, int(pedido.total), return_url)
     return redirect(response['url'] + '?token_ws=' + response['token'])
 
 def confirmar_pago_webpay(request):
     token = request.GET.get('token_ws') or request.POST.get('token_ws')
-    if not token:
-        messages.error(request, "Error: No se recibió token de WebPay")
-        return redirect('core:home')
-
+    if not token: return redirect('core:home')
     try:
-        tx = Transaction(WebpayOptions(
-            IntegrationCommerceCodes.WEBPAY_PLUS, 
-            IntegrationApiKeys.WEBPAY, 
-            IntegrationType.TEST
-        ))
+        tx = Transaction(WebpayOptions(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, IntegrationType.TEST))
         response = tx.commit(token)
         if response['response_code'] == 0:
-            buy_order = response['buy_order']
-            pedido_id = buy_order.split('-')[1]
+            pedido_id = response['buy_order'].split('-')[1]
             pedido = Pedido.objects.get(id=pedido_id)
             pedido.estado = 'Pagado (WebPay)'
             pedido.save()
             
-            carrito = Carrito(request)
-            for item in carrito.obtener_items():
-                prod = get_object_or_404(Producto, id=item['producto_id'])
-                prod.stock -= item['cantidad']
-                prod.save()
+            # Si NO es reserva, descontamos stock. Si ES reserva, no hacemos nada (stock 0)
+            if not pedido.es_reserva:
+                for d in pedido.detalles.all():
+                    d.producto.stock -= d.cantidad
+                    d.producto.save()
             
-            carrito.limpiar()
-            messages.success(request, "¡Pago exitoso con WebPay!")
+            Carrito(request).limpiar()
             return render(request, 'core/exito.html', {'pedido_id': pedido.id})
         else:
-            messages.error(request, "El pago fue anulado o rechazado por WebPay.")
+            messages.error(request, "Pago rechazado.")
             return redirect('core:home')
-    except Exception as e:
-        print(f"Error Webpay: {e}")
-        messages.error(request, "Ocurrió un error técnico al confirmar el pago.")
+    except:
+        messages.error(request, "Error técnico.")
         return redirect('core:home')
-    
-@login_required
-def reservar_producto(request, producto_id):
-    producto = get_object_or_404(Producto, id=producto_id)
-    
-    # Verificar que el usuario tenga perfil de cliente
-    try:
-        cliente = Cliente.objects.get(user=request.user)
-    except Cliente.DoesNotExist:
-        messages.error(request, "Completa tu perfil antes de reservar.")
-        return redirect('core:perfil')
-
-    # Crear un Pedido especial de Reserva
-    pedido_reserva = Pedido.objects.create(
-        cliente=cliente,
-        total=producto.precio, # Precio actual
-        estado='Reserva Pendiente',
-        tipo_entrega='Despacho' # Por defecto, luego se puede cambiar
-    )
-
-    # Crear el detalle
-    DetallePedido.objects.create(
-        pedido=pedido_reserva,
-        producto=producto,
-        cantidad=1,
-        precio_unitario=producto.precio
-    )
-
-    # Notificar a Atención al Cliente
-    try:
-        grupo_atencion = Group.objects.get(name='Atencion al cliente')
-        Notificacion.objects.create(
-            destinatario_grupo=grupo_atencion,
-            pedido=pedido_reserva,
-            mensaje=f"SOLICITUD RESERVA: El cliente {cliente.nombre} solicita stock de {producto.nombre}.",
-            estado='PENDIENTE'
-        )
-    except Group.DoesNotExist:
-        pass
-
-    messages.success(request, f"Solicitud de reserva enviada para {producto.nombre}. Te notificaremos cuando llegue.")
-    return redirect('core:mis_pedidos')

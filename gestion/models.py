@@ -14,10 +14,9 @@ class Producto(models.Model):
         return self.nombre
 
 class Cliente(models.Model):
-    # Usamos el User de Django para la autenticación
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True) 
     
-    # --- NUEVO CAMPO RUT ---
     rut = models.CharField(max_length=12, blank=True, null=True, unique=True, verbose_name="RUT")
     
     nombre = models.CharField(max_length=100)
@@ -55,6 +54,9 @@ class Pedido(models.Model):
     estado = models.CharField(max_length=50, choices=ESTADO_CHOICES, default='Pendiente')
     codigo_seguimiento = models.CharField(max_length=50, blank=True, null=True)
     tipo_entrega = models.CharField(max_length=20, choices=TIPO_ENTREGA_CHOICES, default='Despacho')
+    
+    # ETIQUETA PERMANENTE DE RESERVA ---
+    es_reserva = models.BooleanField(default=False, verbose_name="Es Reserva")
 
     def __str__(self):
         return f"Pedido #{self.id} - {self.cliente.nombre if self.cliente else 'Invitado'}"
@@ -69,7 +71,6 @@ class DetallePedido(models.Model):
         return f"{self.cantidad} x {self.producto.nombre} (Pedido #{self.pedido.id})"
 
 class Notificacion(models.Model):
-    # Definimos los estados posibles
     ESTADOS = [
         ('PENDIENTE', 'Pendiente de Contacto'),
         ('ESPERA', 'Esperando Respuesta del Cliente'),

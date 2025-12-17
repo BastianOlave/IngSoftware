@@ -18,7 +18,7 @@ class Carrito:
                 'nombre': producto.nombre,
                 'precio': str(producto.precio),
                 'cantidad': 0,
-                'imagen': '' # Placeholder por si agregamos imágenes luego
+                'imagen': ''
             }
         self.carrito[producto_id]['cantidad'] += int(cantidad)
         self.guardar()

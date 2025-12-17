@@ -12,33 +12,35 @@
         </a>
     </div>
 
-    <!-- ALERTAS DE ESTADO DE RESERVA -->
+    <!-- ALERTAS DE ESTADO DE RESERVA (Con clase 'alert-permanent' para que no desaparezcan) -->
     {% if pedido.estado == 'Reserva Pendiente' %}
-        <div class="alert alert-warning text-center">
+        <div class="alert alert-warning text-center alert-permanent">
             <h4><i class="bi bi-hourglass-split"></i> Solicitud de Reserva Enviada</h4>
             <p>Estamos procesando tu solicitud con nuestro equipo de logística. Te avisaremos cuando confirmemos con el proveedor.</p>
         </div>
     {% elif pedido.estado == 'Reserva En Camino' %}
-        <div class="alert alert-info text-center">
+        <div class="alert alert-info text-center alert-permanent">
             <h4><i class="bi bi-truck"></i> Producto Solicitado al Proveedor</h4>
             <p>Tu producto ya fue encargado. Te notificaremos apenas llegue a nuestra bodega para que procedas con el pago.</p>
         </div>
     {% elif pedido.estado == 'Reserva Disponible' %}
-        <div class="alert alert-success text-center">
+        <div class="alert alert-success text-center alert-permanent">
             <h4><i class="bi bi-check-circle"></i> ¡Tu producto ya llegó!</h4>
-            <p>El stock ha sido reservado para ti. Por favor, procede al pago para despacharlo.</p>
-            <a href="{% url 'core:seleccion_pago' pedido.id %}" class="btn btn-success btn-lg mt-2 fw-bold">
-                Ir a Pagar Ahora <i class="bi bi-credit-card-2-front"></i>
+            <p>El stock ha sido reservado para ti. Por favor, confirma tus datos para finalizar la compra.</p>
+            
+            <!-- CORRECCIÓN: Botón redirige a 'checkout_reserva' para confirmar datos y envío antes de pagar -->
+            <a href="{% url 'core:checkout_reserva' pedido.id %}" class="btn btn-success btn-lg mt-2 fw-bold shadow">
+                Ir a Pagar Ahora <i class="bi bi-arrow-right-circle ms-2"></i>
             </a>
         </div>
     {% elif 'Anulado' in pedido.estado %}
-        <div class="alert alert-danger text-center">
+        <div class="alert alert-danger text-center alert-permanent">
             <h4><i class="bi bi-x-circle-fill"></i> Este pedido ha sido ANULADO</h4>
             <p>Si tienes dudas, contacta a soporte.</p>
         </div>
     {% endif %}
 
-    <!-- Ocultamos la barra de progreso normal si es una reserva, para no confundir -->
+    <!-- Ocultamos la barra de progreso normal si es una reserva en proceso, para no confundir -->
     {% if 'Reserva' not in pedido.estado %}
         <div class="card shadow-sm mb-4 border-0">
             <div class="card-body p-4">
@@ -62,9 +64,6 @@
     {% endif %}
 
     <div class="row">
-        <!-- ... (El resto de la info del cliente y tabla de productos se mantiene igual) ... -->
-        <!-- Copia el resto de tu archivo original aquí abajo, desde <div class="col-md-4...> -->
-        <!-- Solo cambia el bloque de arriba -->
         <div class="col-md-4 order-md-2 mb-4">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-header bg-success text-white">
@@ -116,7 +115,7 @@
                         </div>
                     {% else %}
                          <div class="d-flex align-items-center text-warning">
-                            <i class="bi bi-hourglass-split fs-4 me-2"></i> Pendiente
+                            <i class="bi bi-hourglass-split fs-4 me-2"></i> Pendiente / Reserva
                         </div>
                     {% endif %}
                 </div>

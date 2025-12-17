@@ -4,7 +4,6 @@ from django.contrib import messages
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db.models import Q
-# Importamos formularios
 from core.forms import CorreoSoporteForm 
 from .forms import CodigoSeguimientoForm
 from .models import Pedido, Notificacion, Producto
@@ -23,11 +22,10 @@ def staff_required(view_func):
 
 @staff_required 
 def dashboard_logistica(request):
-    # SEGURIDAD: Eliminamos 'Pendiente' de la lista.
+    # Quitamos 'En Espera Faltante' de la lista.
     pedidos_pendientes = Pedido.objects.filter(
         Q(estado__startswith='Pagado') | 
-        Q(estado__startswith='En Preparacion') |
-        Q(estado='En Espera Faltante')
+        Q(estado__startswith='En Preparacion')
     ).order_by('fecha')
     
     return render(request, 'gestion/dashboard_logistica.html', {'pedidos': pedidos_pendientes})
@@ -36,12 +34,17 @@ def dashboard_logistica(request):
 def preparar_pedido(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     
-    # SEGURIDAD: Si intentan entrar por URL a un pedido que sigue Pendiente
-    if 'Pendiente' in pedido.estado and 'Pago' not in pedido.estado:
-         messages.error(request, "¡Alto ahí! Ese pedido aún no ha sido pagado.")
+    # SEGURIDAD: Bloqueamos acceso si está Pendiente (no pagado) o es Reserva
+    if 'Pendiente' in pedido.estado or 'Reserva' in pedido.estado:
+         messages.error(request, "¡Alto ahí! Ese pedido aún no ha sido pagado o está reservado.")
          return redirect('dashboard_logistica')
 
-    # Lógica de cambio de estado
+    # Si ya está reportado como faltante, no dejamos entrar a preparar
+    if pedido.estado == 'En Espera Faltante':
+        messages.warning(request, "Este pedido está en espera de resolución por Atención al Cliente.")
+        return redirect('dashboard_logistica')
+
+    # Lógica de cambio de estado (Inicia preparación)
     if 'Pagado' in pedido.estado:
         if 'Transferencia' in pedido.estado:
             pedido.estado = 'En Preparacion (Transferencia)'
@@ -117,19 +120,33 @@ def confirmar_pedido_listo(request, pedido_id):
 @staff_required
 def reportar_faltante(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
+    
     pedido.estado = 'En Espera Faltante'
     pedido.save()
     
+    # Notificamos (CON PROTECCIÓN CONTRA DUPLICADOS)
     try:
         grupo_atencion = Group.objects.get(name='Atencion al cliente')
-        Notificacion.objects.create(
-            destinatario_grupo=grupo_atencion,
+        
+        # Verificamos si ya existe una alerta de faltante para este pedido
+        ya_existe = Notificacion.objects.filter(
             pedido=pedido,
-            mensaje=f"ALERTA: Faltante de stock en el Pedido #{pedido.id} ({pedido.cliente}). Revisar urgente."
-        )
-        messages.warning(request, f"Se ha notificado el faltante a Atención al Cliente.")
+            mensaje__contains="Faltante de stock"
+        ).exists()
+
+        if not ya_existe:
+            Notificacion.objects.create(
+                destinatario_grupo=grupo_atencion,
+                pedido=pedido,
+                mensaje=f"ALERTA: Faltante de stock en el Pedido #{pedido.id} ({pedido.cliente}). Revisar urgente."
+            )
+            messages.warning(request, f"Se ha notificado el faltante a Atención al Cliente.")
+        else:
+            messages.info(request, "Ya se había enviado la alerta anteriormente.")
+            
     except Group.DoesNotExist:
         messages.error(request, "Error: No existe el grupo 'Atencion al cliente'.")
+    
     return redirect('dashboard_logistica')
 
 @staff_required
@@ -157,10 +174,12 @@ def confirmar_transferencia(request, notificacion_id):
     notif = get_object_or_404(Notificacion, id=notificacion_id)
     pedido = notif.pedido
     
-    for detalle in pedido.detalles.all():
-        producto = detalle.producto
-        producto.stock -= detalle.cantidad
-        producto.save()
+    # Si es reserva, se asume que el stock fue gestionado aparte (stock 0).
+    if not pedido.es_reserva:
+        for detalle in pedido.detalles.all():
+            producto = detalle.producto
+            producto.stock -= detalle.cantidad
+            producto.save()
     
     pedido.estado = 'Pagado (Transferencia)'
     pedido.save()
@@ -188,6 +207,12 @@ def redactar_correo(request, notificacion_id):
                     fail_silently=False,
                 )
                 messages.success(request, f"Mensaje enviado a {pedido.cliente.email}.")
+                
+                # Si es una reserva, avanzamos el estado a "En Camino"
+                if 'Reserva' in pedido.estado:
+                    pedido.estado = 'Reserva En Camino'
+                    pedido.save()
+                
                 notif.estado = 'ESPERA'
                 notif.save()
             except Exception as e:
@@ -195,20 +220,32 @@ def redactar_correo(request, notificacion_id):
                 print(e)
             return redirect('dashboard_atencion')
     else:
-        texto_inicial = (
-            f"Estimado/a {pedido.cliente.nombre} {pedido.cliente.apellido},\n\n"
-            f"Nos comunicamos con usted respecto a su Pedido #{pedido.id}.\n\n"
-            "Lamentablemente, el equipo de logística ha detectado un quiebre de stock en uno de los productos solicitados al momento de preparar su despacho.\n\n"
-            "Para solucionar esto a la brevedad, le ofrecemos las siguientes opciones:\n"
-            "1. Reemplazar el producto faltante por otro de características similares.\n"
-            "2. Gestionar la devolución del dinero correspondiente a ese producto.\n"
-            "3. Anular la compra completa y gestionar el reembolso total.\n\n"
-            "Quedamos atentos a su respuesta para proceder según su preferencia.\n\n"
-            "Atentamente,\n"
-            "Equipo de Atención al Cliente - Vive Sano"
-        )
+        if 'Reserva' in pedido.estado:
+            texto_inicial = (
+                f"Estimado/a {pedido.cliente.nombre},\n\n"
+                f"Hemos recibido su solicitud de reserva para el Pedido #{pedido.id}.\n"
+                "Le informamos que ya hemos contactado a nuestro proveedor para solicitar el producto.\n\n"
+                "Le notificaremos nuevamente apenas el producto llegue a nuestra bodega para que pueda realizar el pago y finalizar su compra.\n\n"
+                "Atentamente,\nEquipo Vive Sano"
+            )
+            asunto = f"Reserva Confirmada: Pedido #{pedido.id} en proceso"
+        else:
+            texto_inicial = (
+                f"Estimado/a {pedido.cliente.nombre} {pedido.cliente.apellido},\n\n"
+                f"Nos comunicamos con usted respecto a su Pedido #{pedido.id}.\n\n"
+                "Lamentablemente, el equipo de logística ha detectado un quiebre de stock en uno de los productos solicitados al momento de preparar su despacho.\n\n"
+                "Para solucionar esto a la brevedad, le ofrecemos las siguientes opciones:\n"
+                "1. Reemplazar el producto faltante por otro de características similares.\n"
+                "2. Gestionar la devolución del dinero correspondiente a ese producto.\n"
+                "3. Anular la compra completa y gestionar el reembolso total.\n\n"
+                "Quedamos atentos a su respuesta para proceder según su preferencia.\n\n"
+                "Atentamente,\n"
+                "Equipo de Atención al Cliente - Vive Sano"
+            )
+            asunto = f"IMPORTANTE: Información sobre su Pedido #{pedido.id} - Vive Sano"
+
         initial_data = {
-            'asunto': f"IMPORTANTE: Información sobre su Pedido #{pedido.id} - Vive Sano",
+            'asunto': asunto,
             'mensaje': texto_inicial
         }
         form = CorreoSoporteForm(initial=initial_data)
@@ -225,22 +262,42 @@ def marcar_gestionado(request, notificacion_id):
     notif = get_object_or_404(Notificacion, id=notificacion_id)
     pedido = notif.pedido
     
-    fue_transferencia = Notificacion.objects.filter(
-        pedido=pedido, 
-        mensaje__contains="TRANSFERENCIA"
-    ).exists()
-
-    if fue_transferencia:
-        pedido.estado = 'En Preparacion (Transferencia)'
-    else:
-        pedido.estado = 'En Preparacion (WebPay)'
+    # CASO 1: RESERVA (Producto llegó)
+    if 'Reserva' in pedido.estado:
+        pedido.estado = 'Reserva Disponible'
+        pedido.save()
         
-    pedido.save()
+        try:
+            send_mail(
+                subject=f"¡Llegó tu producto! Completa tu compra #{pedido.id}",
+                message=f"Hola {pedido.cliente.nombre},\n\nTu producto reservado ya está en nuestra bodega.\nPor favor ingresa a tu cuenta en 'Mis Pedidos' y realiza el pago para que podamos despacharlo.\n\n¡Gracias!",
+                from_email=settings.EMAIL_HOST_USER,
+                recipient_list=[pedido.cliente.email],
+                fail_silently=False,
+            )
+        except:
+            pass
+
+        messages.success(request, f"Reserva marcada como DISPONIBLE. Se ha notificado al cliente.")
+
+    # CASO 2: INCIDENCIA NORMAL (Devolver a logística)
+    else:
+        fue_transferencia = Notificacion.objects.filter(
+            pedido=pedido, 
+            mensaje__contains="TRANSFERENCIA"
+        ).exists()
+
+        if fue_transferencia:
+            pedido.estado = 'En Preparacion (Transferencia)'
+        else:
+            pedido.estado = 'En Preparacion (WebPay)'
+            
+        pedido.save()
+        messages.success(request, f"Incidencia resuelta. Pedido devuelto a Logística.")
     
     notif.estado = 'LISTO'
     notif.save()
     
-    messages.success(request, f"Incidencia resuelta. Pedido devuelto a Logística.")
     return redirect('dashboard_atencion')
 
 @staff_required
@@ -248,6 +305,7 @@ def anular_pedido(request, notificacion_id):
     notif = get_object_or_404(Notificacion, id=notificacion_id)
     pedido = notif.pedido
     
+    # Devolver stock solo si estaba pagado o en preparación (las reservas no descontaron stock)
     if 'Pagado' in pedido.estado or 'En Preparacion' in pedido.estado:
         for detalle in pedido.detalles.all():
             producto = detalle.producto
